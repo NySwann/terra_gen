@@ -264,7 +264,7 @@ class Map {
   }
 }
 
-function App() {
+function App2D() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   
   useEffect(() => {
@@ -276,4 +276,4 @@ function App() {
   return <canvas ref={canvasRef} width={1000} height={1000}/>
 }
 
-export default App
+export default App2D

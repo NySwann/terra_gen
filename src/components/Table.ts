@@ -12,7 +12,7 @@ export const configIndexToEdgePositions: { [key: number]: Position[] } =
 }
 
 export const cornerIndexToPosition = [
-  { x: 0, y: 0, z: 0 },
+  { x: 0, y: 0, z: 0 }, // 
   { x: 1, y: 0, z: 0 },
   { x: 0, y: 0, z: 1 },
   { x: 1, y: 0, z: 1 },
@@ -20,6 +20,17 @@ export const cornerIndexToPosition = [
   { x: 1, y: 1, z: 0 },
   { x: 0, y: 1, z: 1 },
   { x: 1, y: 1, z: 1 },
+]
+
+export const cornerIndexToEdgeIndex = [
+ 7, // 000 -> 111
+ 6, // 100 -> 011
+ 5, // 001 -> 110
+ 4, // 101 -> 010
+ 3, // 010 -> 101
+ 2, // 110 -> 001
+ 1, // 011 -> 100
+ 0, // 111 -> 000
 ]
 
 const cornerIndexToGrab = [
@@ -31,6 +42,15 @@ const cornerIndexToGrab = [
   { x: 0.25, y: 0.25, z: -0.25 },
   { x: -0.25, y: 0.25, z: 0.25 },
   { x: 0.25, y: 0.25, z: 0.25 },
+]
+
+const balancedConfigurations = [
+  "11110000",
+  "00001111",
+  "10101010",
+  "01010101",
+  "11001100",
+  "00110011"
 ]
 
 export const configIndexToStr: ConfigurationStr[] = [];
@@ -45,7 +65,7 @@ export class Table {
 
     MeshBuilder.CreateGround("ground", { width: 10, height: 10 }, this.scene);
 
-    this.sphereMesh = MeshBuilder.CreateSphere("sphere", { diameter: 0.2, segments: 4 }, this.scene);
+    this.sphereMesh = MeshBuilder.CreateSphere("sphere", { diameter: 0.4, segments: 4 }, this.scene);
 
     this.sphereMesh.registerInstancedBuffer("color", 4);
     this.sphereMesh.instancedBuffers.color = new Color4(0.2, 0.6, 0.4, 1.0);
@@ -63,7 +83,7 @@ export class Table {
 
     //console.log(configIndexToStr.length);
 
-    this.selectedConfig = configIndexToStr.findIndex(d => d == "01010101");
+    this.selectedConfig = configIndexToStr.findIndex(d => d == "00110011");
 
     //console.log(this.selectedConfig);
 
@@ -141,14 +161,20 @@ export class Table {
       if (config[x] === '1') {
         const cluster = [x];
 
-        this.deepSearchClusters(selectedConfig, x, cluster);
+        let edgePosition: Position;
 
-        const clusterGrabs = cluster.map(i => cornerIndexToGrab[i]);
+        if (balancedConfigurations.includes(config)) {
+          edgePosition = {x: 0, y: 0, z: 0};
+        } else {
+          this.deepSearchClusters(selectedConfig, x, cluster);
 
-        const edgePosition: Position = clusterGrabs.length == 4 ? {x: 0, y: 0, z: 0}: {
-          x: clusterGrabs.reduce((acc, v) => acc + v.x, 0) / clusterGrabs.length,
-          y: clusterGrabs.reduce((acc, v) => acc + v.y, 0) / clusterGrabs.length,
-          z: clusterGrabs.reduce((acc, v) => acc + v.z, 0) / clusterGrabs.length
+          const clusterGrabs = cluster.map(i => cornerIndexToGrab[i]);
+
+          edgePosition = {
+            x: clusterGrabs.reduce((acc, v) => acc + v.x, 0) / clusterGrabs.length,
+            y: clusterGrabs.reduce((acc, v) => acc + v.y, 0) / clusterGrabs.length,
+            z: clusterGrabs.reduce((acc, v) => acc + v.z, 0) / clusterGrabs.length
+          }
         }
 
         if (!configIndexToEdgePositions[selectedConfig]) {
