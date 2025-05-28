@@ -138,7 +138,7 @@ export class Table {
 
     //console.log(this.selectedConfig);
 
-    this.visualize();
+    //this.visualize();
   }
 
   generateConfig(depth: number, target: number, prev: Configuration) {
