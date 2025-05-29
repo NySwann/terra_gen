@@ -39,6 +39,16 @@ interface Block {
     Position | null,
     Position | null
   ];
+  edgesConfigs: [
+    string | null,
+    string  | null,
+    string  | null,
+    string  | null,
+   string  | null,
+    string  | null,
+    string  | null,
+    string  | null
+  ];
 }
 
 export class Terrain {
@@ -92,6 +102,7 @@ export class Terrain {
       1.0
     );
 
+
     this.generate();
     this.computeEdges();
     this.drawCorners();
@@ -102,6 +113,9 @@ export class Terrain {
 
     // this.computeTriangles();
     // this.drawTriangles();
+
+        this.opaqueSphereMesh.position.set(100, 100, 100);
+        this.transparentSphereMesh.position.set(100, 100, 100);
   }
 
   generate() {
@@ -114,12 +128,14 @@ export class Terrain {
         const rowy: Block[] = [];
 
         for (let z = 0; z < this.size; z++) {
-          const v =
+          let v =
             noise.noise3D(x / 16, y / 16, z / 16) +
               noise.noise3D(x / 32, y / 32, z / 32) >=
             0.5
-              ? "solid"
-              : "gaz";
+              ? true
+              : false;
+
+          v ||= x == this.size / 2 && y == this.size / 2 && z == this.size / 2;
 
           // const v =
           //   Math.sqrt(
@@ -127,11 +143,11 @@ export class Terrain {
           //       (y - 15.0) * (y - 15.0) +
           //       +(z - 15.0) * (z - 15.0)
           //   ) < 10
-          //     ? "solid"
-          //     : "gaz";
-          // const v = Math.random() <= 0.3 ? "solid" : "gaz";
-          //const v = (x ==10) ? "solid" : "gaz";
-          //const v = x == 10 && y == 10 && z == 10 ? "solid" : "gaz";
+          //     ? true
+          //     : false;
+          // const v = Math.random() <= 0.3 ? true : false;
+          //const v = (x ==10) ? true : false;
+          //const v = x == 10 && y == 10 && z == 10 ? true : false;
 
           // const v =
           //   x > this.size / 2 - 5 &&
@@ -140,12 +156,13 @@ export class Terrain {
           //   y < this.size / 2 + 5 &&
           //   z > this.size / 2 - 5 &&
           //   z < this.size / 2 + 5
-          //     ? "solid"
-          //     : "gaz";
+          //     ? true
+          //     : false;
 
           rowy.push({
-            v: v,
+            v: v ? "solid" : "gaz",
             edges: [null, null, null, null, null, null, null, null],
+            edgesConfigs: [null, null, null, null, null, null, null, null],
           });
         }
 
@@ -204,7 +221,9 @@ export class Terrain {
               const corner =
                 this.data[x + cornerPos.x][y + cornerPos.y][z + cornerPos.z];
 
-              if (corner.v === "solid" || corner.v === "gaz") {
+              corner.edgesConfigs[cornerIndexToEdgeIndex[i]] = config;
+
+              if (true || corner.v === "solid" || corner.v === "gaz") {
                 //console.log(i);
 
                 const edge = configuration?.[i];
@@ -242,10 +261,12 @@ export class Terrain {
   }
 
   drawCorners() {
-    for (let x = 0; x < this.size; x++) {
-      for (let y = 0; y < this.size; y++) {
-        for (let z = 0; z < this.size; z++) {
-          if (this.data[x][y][z].edges.findIndex((i) => i !== null) >= 0) {
+    for (let x = 0; x < this.size - 1; x++) {
+      for (let y = 0; y < this.size - 1; y++) {
+        for (let z = 0; z < this.size - 1; z++) {
+          const corner = this.data[x][y][z];
+
+          if (corner.edgesConfigs.some(c => c !== "00000000" && c !== "11111111" && c !== null)) {
             const mesh = this.transparentSphereMesh.createInstance(`lol`);
 
             mesh.parent = this.root;
@@ -257,8 +278,8 @@ export class Terrain {
 
             mesh.instancedBuffers.color =
               this.data[x][y][z].v === "solid"
-                ? new Color4(1, 1, 1, 0.6)
-                : new Color4(0, 0, 1, 0.2);
+                ? new Color4(1, 1, 1, 0.8)
+                : new Color4(0, 0, 1, 0.4);
           }
         }
       }
@@ -364,7 +385,9 @@ export class Terrain {
                           z: z + (0.5 - otherCorner.z) + otherEdge.z,
                         });
                         this.lines.push(cornerTriangles);
-                      } else {
+                      } 
+                      
+                      else if (false) {
                         const farAxisCornerIndexes = cornerIndexToPosition
                           .map((c, i) =>
                             c[axis] === (sign === -1 ? 0 : 1) ? i : -1
@@ -421,7 +444,7 @@ export class Terrain {
                               farEdge.z,
                           });
                           this.lines.push(cornerTriangles);
-                        } else {
+                        } else if (false) {
                           const farOpposedAxisCornerIndexes =
                             cornerIndexToPosition
                               .map((c, i) =>
@@ -437,7 +460,7 @@ export class Terrain {
                                 ] === cornerIndexToPosition[i][otherAxis] &&
                                 cornerIndexToPosition[selfAxisCornerIndex][
                                   lastAxis
-                                ] === cornerIndexToPosition[i][lastAxis]
+                                ] !== cornerIndexToPosition[i][lastAxis]
                             )!;
 
                           if (farOpposedCornerIndex === undefined) {

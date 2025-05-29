@@ -139,6 +139,8 @@ export class Table {
     //console.log(this.selectedConfig);
 
     //this.visualize();
+
+    this.sphereMesh.position.set(100, 100, 100);
   }
 
   generateConfig(depth: number, target: number, prev: Configuration) {
