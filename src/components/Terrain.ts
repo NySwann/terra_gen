@@ -67,7 +67,7 @@ export class Terrain {
 
     this.opaqueSphereMesh = MeshBuilder.CreateSphere(
       "sphere",
-      { diameter: 0.4, segments: 1 },
+      { diameter: 0.2, segments: 1 },
       this.scene
     );
     this.opaqueSphereMesh.registerInstancedBuffer("color", 4);
@@ -80,7 +80,7 @@ export class Terrain {
 
     this.transparentSphereMesh = MeshBuilder.CreateBox(
       "sphere",
-      { size: 0.4 },
+      { size: 0.2 },
       this.scene
     );
     this.transparentSphereMesh.hasVertexAlpha = true;
@@ -94,7 +94,7 @@ export class Terrain {
 
     this.generate();
     this.computeEdges();
-    //this.drawCorners();
+    this.drawCorners();
     this.drawEdges();
 
     this.computeLines();
@@ -284,7 +284,15 @@ export class Terrain {
               mesh.position.z = z + (0.5 - cornerPos.z) + edgePos.z;
               mesh.freezeWorldMatrix();
 
-              mesh.instancedBuffers.color = new Color4(1, 1, 0, 1);
+              if (
+                Math.abs(edgePos.x) > 0.5 ||
+                Math.abs(edgePos.y) > 0.5 ||
+                Math.abs(edgePos.z) > 0.5
+              ) {
+                mesh.instancedBuffers.color = new Color4(1, 0, 0, 1);
+              } else {
+                mesh.instancedBuffers.color = new Color4(1, 1, 0, 1);
+              }
             }
           }
         }
@@ -302,7 +310,7 @@ export class Terrain {
           [1, -1].forEach((sign) => {
             ["x", "y", "z"].forEach((axis) => {
               const selfAxisCornerIndexes = cornerIndexToPosition
-                .map((c, i) => (c[axis] === (sign === 1 ? 0 : 1) ? i : -1))
+                .map((c, i) => (c[axis] === (sign === 1 ? 1 : 0) ? i : -1))
                 .filter((i) => i >= 0);
 
               for (const selfAxisCornerIndex of selfAxisCornerIndexes) {
@@ -357,10 +365,124 @@ export class Terrain {
                         });
                         this.lines.push(cornerTriangles);
                       } else {
-                        const relativeCorderData =
+                        const farAxisCornerIndexes = cornerIndexToPosition
+                          .map((c, i) =>
+                            c[axis] === (sign === -1 ? 0 : 1) ? i : -1
+                          )
+                          .filter((i) => i >= 0);
+
+                        const farCornerIndex = farAxisCornerIndexes.find(
+                          (i) =>
+                            cornerIndexToPosition[selfAxisCornerIndex][
+                              otherAxis
+                            ] === cornerIndexToPosition[i][otherAxis] &&
+                            cornerIndexToPosition[selfAxisCornerIndex][
+                              lastAxis
+                            ] === cornerIndexToPosition[i][lastAxis]
+                        )!;
+
+                        if (farCornerIndex === undefined) {
+                          throw new Error("tf2");
+                        }
+
+                        const farCornerData =
                           this.data[x + (axis === "x" ? sign : 0)][
                             y + (axis === "y" ? sign : 0)
                           ][z + (axis === "z" ? sign : 0)];
+
+                        const farCorner = cornerIndexToPosition[farCornerIndex];
+                        const farEdge =
+                          farCornerData.edges[
+                            cornerIndexToEdgeIndex[farCornerIndex]
+                          ];
+
+                        if (farEdge) {
+                          const cornerTriangles: Position[] = [];
+                          cornerTriangles.push({
+                            x: x + (0.5 - selfCorner.x) + selfEdge.x,
+                            y: y + (0.5 - selfCorner.y) + selfEdge.y,
+                            z: z + (0.5 - selfCorner.z) + selfEdge.z,
+                          });
+                          cornerTriangles.push({
+                            x:
+                              x +
+                              (axis === "x" ? sign : 0) +
+                              (0.5 - farCorner.x) +
+                              farEdge.x,
+                            y:
+                              y +
+                              (axis === "y" ? sign : 0) +
+                              (0.5 - farCorner.y) +
+                              farEdge.y,
+                            z:
+                              z +
+                              (axis === "z" ? sign : 0) +
+                              (0.5 - farCorner.z) +
+                              farEdge.z,
+                          });
+                          this.lines.push(cornerTriangles);
+                        } else {
+                          const farOpposedAxisCornerIndexes =
+                            cornerIndexToPosition
+                              .map((c, i) =>
+                                c[axis] === (sign === -1 ? 0 : 1) ? i : -1
+                              )
+                              .filter((i) => i >= 0);
+
+                          const farOpposedCornerIndex =
+                            farOpposedAxisCornerIndexes.find(
+                              (i) =>
+                                cornerIndexToPosition[selfAxisCornerIndex][
+                                  otherAxis
+                                ] === cornerIndexToPosition[i][otherAxis] &&
+                                cornerIndexToPosition[selfAxisCornerIndex][
+                                  lastAxis
+                                ] === cornerIndexToPosition[i][lastAxis]
+                            )!;
+
+                          if (farOpposedCornerIndex === undefined) {
+                            throw new Error("tf2");
+                          }
+
+                          const farOpposedCornerData =
+                            this.data[x + (axis === "x" ? sign : 0)][
+                              y + (axis === "y" ? sign : 0)
+                            ][z + (axis === "z" ? sign : 0)];
+
+                          const farOpposedCorner =
+                            cornerIndexToPosition[farOpposedCornerIndex];
+                          const farOpposedEdge =
+                            farOpposedCornerData.edges[
+                              cornerIndexToEdgeIndex[farOpposedCornerIndex]
+                            ];
+
+                          if (farOpposedEdge) {
+                            const cornerTriangles: Position[] = [];
+                            cornerTriangles.push({
+                              x: x + (0.5 - selfCorner.x) + selfEdge.x,
+                              y: y + (0.5 - selfCorner.y) + selfEdge.y,
+                              z: z + (0.5 - selfCorner.z) + selfEdge.z,
+                            });
+                            cornerTriangles.push({
+                              x:
+                                x +
+                                (axis === "x" ? sign : 0) +
+                                (0.5 - farOpposedCorner.x) +
+                                farOpposedEdge.x,
+                              y:
+                                y +
+                                (axis === "y" ? sign : 0) +
+                                (0.5 - farOpposedCorner.y) +
+                                farOpposedEdge.y,
+                              z:
+                                z +
+                                (axis === "z" ? sign : 0) +
+                                (0.5 - farOpposedCorner.z) +
+                                farOpposedEdge.z,
+                            });
+                            this.lines.push(cornerTriangles);
+                          }
+                        }
                       }
                     });
                 }
