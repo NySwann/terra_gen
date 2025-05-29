@@ -51,6 +51,78 @@ interface Block {
   ];
 }
 
+function abs(p: Position)
+{
+  return {x: Math.abs(p.x), y: Math.abs(p.y), z: Math.abs(p.z)};
+}
+
+function min(a: Position, b: Position)
+{
+  return {x: Math.min(a.x, b.x), y: Math.min(a.x, b.y), z: Math.min(a.z, b.z)};
+}
+
+function minn(a: Position, b: number)
+{
+  return {x: Math.min(a.x, b), y: Math.min(a.x, b), z: Math.min(a.z, b)};
+}
+
+function max(a: Position, b: Position)
+{
+  return {x: Math.max(a.x, b.x), y: Math.max(a.x, b.y), z: Math.max(a.z, b.z)};
+}
+
+function maxn(a: Position, b: number)
+{
+  return {x: Math.max(a.x, b), y: Math.max(a.x, b), z: Math.max(a.z, b)};
+}
+
+function sub(a: Position, b: Position)
+{
+  return {x: a.x - b.x, y: a.y - b.y, z: a.z - b.z};
+}
+
+function subn(a: Position, b: number)
+{
+  return {x: a.x - b, y: a.y - b, z: a.z - b};
+}
+
+function add(a: Position, b: Position)
+{
+  return {x: a.x + b.x, y: a.y + b.y, z: a.z + b.z};
+}
+
+function addn(a: Position, b: number)
+{
+  return {x: a.x + b, y: a.y + b, z: a.z + b};
+}
+
+function vec3(x: number, y: number, z: number)
+{
+  return {x, y, z};
+}
+
+function length(p: Position)
+{
+  return Math.sqrt((p.x * p.x) + (p.y * p.y) + (p.z * p.z));
+}
+
+function sdRoundBox(p: Position, b: Position, r: number ): number
+{
+  const q: Position = addn(sub(abs(p), b), r);
+
+  return length(maxn(q,0.0)) + Math.min(Math.max(q.x,Math.max(q.y,q.z)),0.0) - r;
+}
+
+function sdBoxFrame(p: Position, b: Position, e: number): number
+{
+  const p2 = sub(abs(p), b);
+  const q = abs(subn(addn(p2,e), e));
+  return Math.min(Math.min(
+      length(maxn(vec3(p2.x,q.y,q.z),0.0))+Math.min(Math.max(p2.x,Math.max(q.y,q.z)),0.0),
+      length(maxn(vec3(q.x,p2.y,q.z),0.0))+Math.min(Math.max(q.x,Math.max(p2.y,q.z)),0.0)),
+      length(maxn(vec3(q.x,q.y,p2.z),0.0))+Math.min(Math.max(q.x,Math.max(q.y,p2.z)),0.0));
+}
+
 export class Terrain {
   scene: Scene;
   size: number;
@@ -106,7 +178,7 @@ export class Terrain {
     this.generate();
     this.computeEdges();
     this.drawCorners();
-    this.drawEdges();
+    //this.drawEdges();
 
     this.computeLines();
     this.drawLines();
@@ -128,36 +200,41 @@ export class Terrain {
         const rowy: Block[] = [];
 
         for (let z = 0; z < this.size; z++) {
-          let v =
+          let v = false;
+
+          v ||=
             noise.noise3D(x / 16, y / 16, z / 16) +
               noise.noise3D(x / 32, y / 32, z / 32) >=
-            0.5
-              ? true
-              : false;
+            0.5;
 
           v ||= x == this.size / 2 && y == this.size / 2 && z == this.size / 2;
 
-          // const v =
-          //   Math.sqrt(
-          //     (x - 15.0) * (x - 15.0) +
-          //       (y - 15.0) * (y - 15.0) +
-          //       +(z - 15.0) * (z - 15.0)
-          //   ) < 10
-          //     ? true
-          //     : false;
-          // const v = Math.random() <= 0.3 ? true : false;
-          //const v = (x ==10) ? true : false;
-          //const v = x == 10 && y == 10 && z == 10 ? true : false;
+          const sphereRadius = 4;
+          const spherePosition = {x: 0 + sphereRadius + 2, y: 0 + sphereRadius + 2, z: 0 + sphereRadius + 2};
 
-          // const v =
-          //   x > this.size / 2 - 5 &&
-          //   x < this.size / 2 + 5 &&
-          //   y > this.size / 2 - 5 &&
-          //   y < this.size / 2 + 5 &&
-          //   z > this.size / 2 - 5 &&
-          //   z < this.size / 2 + 5
-          //     ? true
-          //     : false;
+           v ||=
+            Math.sqrt(
+              (x - spherePosition.x ) * (x - spherePosition.x ) +
+                (y - spherePosition.y ) * (y - spherePosition.y ) +
+                + (z - spherePosition.z ) * (z - spherePosition.z )
+            ) < sphereRadius;
+
+          // v ||= Math.random() <= 0.1;
+          v ||= (x ==10);
+          v ||= x == 10 && y == 10 && z == 10;
+
+          const cubeRadius = 4;
+          const cubePosition = {x: this.size - cubeRadius - 2, y: this.size - cubeRadius - 2, z: this.size - cubeRadius - 2};
+
+           v ||=
+            x > (cubePosition.x - cubeRadius) &&
+            x < (cubePosition.x + cubeRadius) &&
+            y > (cubePosition.y - cubeRadius) &&
+            y < (cubePosition.y + cubeRadius) &&
+            z > (cubePosition.z - cubeRadius) &&
+            z < (cubePosition.z + cubeRadius)
+
+          // v||= sdRoundBox(vec3(x, y, z), vec3(this.size/2, this.size/2, this.size/2), 10) < 0;
 
           rowy.push({
             v: v ? "solid" : "gaz",
@@ -278,8 +355,8 @@ export class Terrain {
 
             mesh.instancedBuffers.color =
               this.data[x][y][z].v === "solid"
-                ? new Color4(1, 1, 1, 0.8)
-                : new Color4(0, 0, 1, 0.4);
+                ? new Color4(1, 0, 0, 1)
+                : new Color4(0, 0, 1, 0.0);
           }
         }
       }
@@ -330,9 +407,27 @@ export class Terrain {
 
           [1, -1].forEach((sign) => {
             ["x", "y", "z"].forEach((axis) => {
+                                                      const farCornerData =
+                          this.data[x + (axis === "x" ? sign : 0)][
+                            y + (axis === "y" ? sign : 0)
+                          ][z + (axis === "z" ? sign : 0)];
+
               const selfAxisCornerIndexes = cornerIndexToPosition
                 .map((c, i) => (c[axis] === (sign === 1 ? 1 : 0) ? i : -1))
                 .filter((i) => i >= 0);
+
+                if (selfAxisCornerIndexes.length !== 4) {
+                  throw new Error();
+                }
+
+              const revertedSelfAxisCornerIndexes = cornerIndexToPosition
+                .map((c, i) => (c[axis] === (sign === 1 ? 0 : 1) ? i : -1))
+                .filter((i) => i >= 0);
+
+
+                if (revertedSelfAxisCornerIndexes.length !== 4) {
+                  throw new Error();
+                }
 
               for (const selfAxisCornerIndex of selfAxisCornerIndexes) {
                 const selfCorner = cornerIndexToPosition[selfAxisCornerIndex];
@@ -385,16 +480,10 @@ export class Terrain {
                           z: z + (0.5 - otherCorner.z) + otherEdge.z,
                         });
                         this.lines.push(cornerTriangles);
-                      } 
-                      
-                      else if (false) {
-                        const farAxisCornerIndexes = cornerIndexToPosition
-                          .map((c, i) =>
-                            c[axis] === (sign === -1 ? 0 : 1) ? i : -1
-                          )
-                          .filter((i) => i >= 0);
+                      }
 
-                        const farCornerIndex = farAxisCornerIndexes.find(
+                      else if (false) {
+                          const otherCornerIndex = revertedSelfAxisCornerIndexes.find(
                           (i) =>
                             cornerIndexToPosition[selfAxisCornerIndex][
                               otherAxis
@@ -404,22 +493,18 @@ export class Terrain {
                             ] === cornerIndexToPosition[i][lastAxis]
                         )!;
 
-                        if (farCornerIndex === undefined) {
+                        if (otherCornerIndex === undefined) {
                           throw new Error("tf2");
                         }
 
-                        const farCornerData =
-                          this.data[x + (axis === "x" ? sign : 0)][
-                            y + (axis === "y" ? sign : 0)
-                          ][z + (axis === "z" ? sign : 0)];
-
-                        const farCorner = cornerIndexToPosition[farCornerIndex];
-                        const farEdge =
+                        const otherCorner =
+                          cornerIndexToPosition[otherCornerIndex];
+                        const otherEdge =
                           farCornerData.edges[
-                            cornerIndexToEdgeIndex[farCornerIndex]
+                            cornerIndexToEdgeIndex[otherCornerIndex]
                           ];
 
-                        if (farEdge) {
+                        if (otherEdge) {
                           const cornerTriangles: Position[] = [];
                           cornerTriangles.push({
                             x: x + (0.5 - selfCorner.x) + selfEdge.x,
@@ -427,24 +512,26 @@ export class Terrain {
                             z: z + (0.5 - selfCorner.z) + selfEdge.z,
                           });
                           cornerTriangles.push({
-                            x:
-                              x +
-                              (axis === "x" ? sign : 0) +
-                              (0.5 - farCorner.x) +
-                              farEdge.x,
-                            y:
-                              y +
-                              (axis === "y" ? sign : 0) +
-                              (0.5 - farCorner.y) +
-                              farEdge.y,
-                            z:
-                              z +
-                              (axis === "z" ? sign : 0) +
-                              (0.5 - farCorner.z) +
-                              farEdge.z,
-                          });
+                              x:
+                                x +
+                                (axis === "x" ? sign : 0) +
+                                (0.5 - otherCorner.x) +
+                                otherEdge.x,
+                              y:
+                                y +
+                                (axis === "y" ? sign : 0) +
+                                (0.5 - otherCorner.y) +
+                                otherEdge.y,
+                              z:
+                                z +
+                                (axis === "z" ? sign : 0) +
+                                (0.5 - otherCorner.z) +
+                                otherEdge.z,
+                            });
                           this.lines.push(cornerTriangles);
-                        } else if (false) {
+                        }
+                        
+                       else if (false) {
                           const farOpposedAxisCornerIndexes =
                             cornerIndexToPosition
                               .map((c, i) =>

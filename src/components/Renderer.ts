@@ -70,6 +70,11 @@ export class Renderer {
     this.scene.enablePhysics(gravity, plugin);
   }
 
+  dispose() {
+    this.scene.dispose();
+    this.engine.dispose();
+  }
+
   _fps(): void {
     const dom = document.getElementById("display-fps");
     if (dom) {
