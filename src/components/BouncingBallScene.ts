@@ -7,7 +7,6 @@ import { Tools } from "@babylonjs/core/Misc/tools";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 // import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
-import { Ground } from "./BallAndGround";
 
 export default class BoucingBallScene {
   private camera: ArcRotateCamera;
@@ -42,6 +41,6 @@ export default class BoucingBallScene {
 
   async loadComponents(): Promise<void> {
     // Load your files in order
-    new Ground(this.scene);
+    //new Ground(this.scene);
   }
 }

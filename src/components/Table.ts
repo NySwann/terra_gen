@@ -49,31 +49,6 @@ export const cornerIndexToEdgeIndex = [
   0, // 111 -> 000
 ];
 
-const directionInfos = [
-  {
-    name: "up",
-    component: "y",
-    direction: 1,
-    edges: [
-      {
-        self: cornerIndexToPosition.find((c) => c.y === 0),
-        other: cornerIndexToPosition.find((c) => c.y === 1),
-      },
-    ],
-  },
-  {
-    name: "down",
-    component: "y",
-    direction: -1,
-    edges: [
-      {
-        self: cornerIndexToPosition.find((c) => c.y === 1),
-        other: cornerIndexToPosition.find((c) => c.y === 0),
-      },
-    ],
-  },
-];
-
 const cornerIndexToGrab = [
   { x: -0.25, y: -0.25, z: -0.25 },
   { x: 0.25, y: -0.25, z: -0.25 },
@@ -140,7 +115,7 @@ export class Table {
 
     //console.log(this.selectedConfig);
 
-    this.visualize();
+    // this.visualize();
 
     this.sphereMesh.position.set(100, 100, 100);
   }

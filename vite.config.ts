@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
         "@": pathResolve("src"),
       },
       // https://github.com/vitejs/vite/issues/178#issuecomment-630138450
-      extensions: [".js", ".ts", ".json"],
+      extensions: [".js", ".ts", ".jsx", ".tsx", ".json"],
     },
     // https://vitejs.cn/config/#esbuild
     esbuild: {
