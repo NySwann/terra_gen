@@ -4,6 +4,8 @@ import {
   precomputed_configIndexToEdgePositions,
   precomputed_configIndexToStr,
 } from "./TableComputed";
+import fontData from "./droid.json";
+import earcut from 'earcut';
 
 type Position = { x: number; y: number; z: number };
 
@@ -138,7 +140,7 @@ export class Table {
 
     //console.log(this.selectedConfig);
 
-    //this.visualize();
+    this.visualize();
 
     this.sphereMesh.position.set(100, 100, 100);
   }
@@ -315,6 +317,8 @@ export class Table {
       return;
     }
 
+    const p = {x: 0.0, y: 0.0, z: 0.0};
+
     const config = configIndexToStr[this.selectedConfig];
 
     console.log(config);
@@ -324,14 +328,31 @@ export class Table {
 
       const position = cornerIndexToPosition[x];
 
-      mesh.position.x = position.x - 5.0;
-      mesh.position.y = position.y;
-      mesh.position.z = position.z - 5.0;
+      mesh.position.x = position.x + p.x;
+      mesh.position.y = position.y + p.y;
+      mesh.position.z = position.z + p.z;
 
       mesh.freezeWorldMatrix();
 
       mesh.instancedBuffers.color =
         config[x] === "1" ? new Color4(1, 1, 1, 1) : new Color4(0, 0, 1, 1);
+
+      const text = MeshBuilder.CreateText(
+      "myText",
+      JSON.stringify(position),
+      fontData,
+      {
+        size: 0.06,
+        depth: 0.01,
+        resolution: 6,
+      },
+      this.scene,
+      earcut
+      )!;
+
+      text.position.x = position.x + p.x;
+      text.position.y = position.y + p.y + 0.5;
+     text.position.z = position.z + p.z;  
 
       const ce = configIndexToEdgePositions[this.selectedConfig];
 
@@ -341,9 +362,9 @@ export class Table {
         if (e) {
           const mesh = this.sphereMesh.createInstance(`lol`);
 
-          mesh.position.x = 0.5 + e.x - 5.0;
-          mesh.position.y = 0.5 + e.y;
-          mesh.position.z = 0.5 + e.z - 5.0;
+          mesh.position.x = 0.5 + e.x + p.x;
+          mesh.position.y = 0.5 + e.y + p.y;
+          mesh.position.z = 0.5 + e.z + p.z;
 
           mesh.freezeWorldMatrix();
 

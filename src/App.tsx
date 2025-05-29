@@ -12,6 +12,7 @@ function App() {
       const canvasElement = document.createElement('canvas')
       canvasElement.width = 1000;
       canvasElement.height = 1000;
+      //canvasElement.id = '#renderCanvas'
       node.appendChild(canvasElement);
 
       const renderer = new Renderer(canvasElement);

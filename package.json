@@ -19,6 +19,7 @@
     "@babylonjs/materials": "^8.8.5",
     "@babylonjs/post-processes": "^8.8.5",
     "@babylonjs/serializers": "^8.8.5",
+    "earcut": "^3.0.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

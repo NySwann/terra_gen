@@ -122,7 +122,7 @@ export class Renderer {
   // Auxiliary Class Configuration
   _config(): void {
     // Axes
-    // new AxesViewer();
+    new AxesViewer();
 
     // Inspector and other stuff
     this._bindEvent();
