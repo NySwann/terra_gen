@@ -1,5 +1,5 @@
 import { Scene } from "@babylonjs/core/scene";
-import { mkSimplexNoise } from "../perlin";
+import { mkSimplexNoise, SimplexNoise } from "../perlin";
 import {
   Color3,
   Color4,
@@ -22,10 +22,15 @@ interface Quad {
   points: [Point, Point, Point, Point];
 }
 
+interface Line {
+  a: Point,
+  b: Point,
+  quads: Quad[];
+}
+
 interface Point {
   position: Position;
-  links: Point[];
-  quad?: Quad;
+  lines: Line[];
 }
 
 interface Position {
@@ -61,19 +66,43 @@ interface Block {
   points: Point[]
 }
 
+function is_line(l: Line, p1: Point, p2: Point) {
+  return (l.a === p1 && l.b === p2) || (l.a === p2 && l.b === p1);
+}
+
 function eqn(a: number, b: number) {
   return Math.abs(a - b) < 0.00001;
 }
 
 function distance(a: Position, b: Position) {
-  return Math.sqrt((a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y) + (a.z - b.z)*(a.z - b.z));
+  return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) + (a.z - b.z) * (a.z - b.z));
 }
 
+function middle(a: Position, b: Position) {
+  return {x : (a.x + b.x) / 2, y : (a.y + b.y) / 2, z : (a.z + b.z) / 2}
+}
+
+function sfc32(a, b, c, d) {
+  return function() {
+    a |= 0; b |= 0; c |= 0; d |= 0;
+    const t = (a + b | 0) + d | 0;
+    d = d + 1 | 0;
+    a = b ^ b >>> 9;
+    b = c + (c << 3) | 0;
+    c = (c << 21 | c >>> 11);
+    c = c + t | 0;
+    return (t >>> 0) / 4294967296;
+  }
+}
+
+const lines = true;
+const debug = false;
 
 export class Terrain {
+  noise: SimplexNoise;
   scene: Scene;
   size: number;
-  data: Block[][][];
+  data: Block[];
   cubeMesh: Mesh;
   transparentSphereMesh: Mesh;
   triangles: [Position, Position, Position][];
@@ -86,11 +115,23 @@ export class Terrain {
     this.scene = scene;
 
     this.size = 50;
-    this.data = [];
+    this.data = new Array(this.size * this.size * this.size).fill(null).map(()=> ({
+      v: "gaz",
+      edges: [null, null, null, null, null, null, null, null],
+      edgesConfigs: [null, null, null, null, null, null, null, null],
+      points: [],
+    }));
     this.triangles = [];
     this.meshLines = [];
     this.ownerLines = [];
     this.debugLines = [];
+
+    //const seed = [Math.floor(Math.random() * 100), Math.floor(Math.random() * 100), Math.floor(Math.random() * 100), Math.floor(Math.random() * 100)];
+    const seed = [85, 44, 74, 6];
+    console.log("seed", seed);
+    const random = sfc32(seed[0], seed[1], seed[2], seed[3]);
+
+    this.noise = mkSimplexNoise(random);
 
     this.root = new TransformNode("root", this.scene);
 
@@ -109,24 +150,22 @@ export class Terrain {
       1.0
     );
 
-    const debug = false;
-
     this.generate();
-    this.computeEdges();
+    this.compute();
+    !debug && this.draw();
+
+    lines && this.drawMeshLines();
+
     debug && this.drawCorners();
     //debug && this.drawEdges();
-
-    this.computeLines();
     //debug && this.drawOwnerLines();
     debug && this.drawDebugLines();
-    debug && this.drawMeshLines();
-    this.drawTriangles();
 
     this.cubeMesh.position.set(100, 100, 100);
   }
 
   getPoint(x: number, y: number, z: number): Point {
-    const voxel = this.data[Math.floor(x)][Math.floor(y)][Math.floor(z)];
+    const voxel = this.getData(Math.floor(x), Math.floor(y), Math.floor(z));
 
     if (!voxel) {
       console.log(x, y, z);
@@ -140,126 +179,210 @@ export class Terrain {
       }
     }
 
-    const point = { position: { x, y, z }, links: [] };
+    const point = { position: { x, y, z }, lines: [] };
 
     voxel.points.push(point);
 
     return point;
   }
 
-  generate() {
-    const noise = mkSimplexNoise(Math.random);
+  makeQuad(p1: Point, p2: Point, p3: Point, p4: Point) {
+    if (new Set([p1, p2, p3, p4]).size !== 4) {
+      return;
+    } 
 
-    for (let x = 0; x < this.size; x++) {
-      const rowx: Block[][] = [];
+    const quad: Quad = { points: [p1, p2, p3, p4] };
 
-      for (let y = 0; y < this.size; y++) {
-        const rowy: Block[] = [];
+    p1.lines.find(l => is_line(l, p1, p2))!.quads.push(quad);
+    p2.lines.find(l => is_line(l, p2, p3))!.quads.push(quad);
+    p3.lines.find(l => is_line(l, p3, p4))!.quads.push(quad);
+    p4.lines.find(l => is_line(l, p4, p1))!.quads.push(quad);
 
-        for (let z = 0; z < this.size; z++) {
-          let v = false;
+    const d1 = distance(p1.position, p3.position);
+    const d2 = distance(p2.position, p4.position);
 
-                  v ||=
-          noise.noise3D(x / 4, y / 4, z / 4) >=
-          0.8;
+    let triangles;
 
-          // v ||=
-          //   noise.noise3D(x / 8, y / 8, z / 8) +
-          //   noise.noise3D(x / 16, y / 16, z / 16) >=
-          //   0.5;
+    if (d1 <= d2) {
+      triangles = [[p1.position, p2.position, p3.position], [p3.position, p4.position, p1.position]];
+    } else {
+      triangles = [[p2.position, p3.position, p4.position], [p4.position, p1.position, p2.position]];
+    }
 
-                      v ||=
-                      noise.noise3D(x / 16, y / 16, z / 16) +
-            noise.noise3D(x / 32, y / 32, z / 32) >=
-            0.5;
+    this.triangles.push(...triangles);
 
-          // v ||= x == this.size / 2 && y == this.size / 2 && z == this.size / 2;
+    // si le quad est pas du tout planar, on se rajoute une petite ligne pour que ca looks good
 
-          const sphereRadius = 10;
-          const spherePosition = { x: (this.size - 2) - sphereRadius, y: (this.size - 2) - sphereRadius, z: (this.size - 2) - sphereRadius };
-          //const spherePosition = { x: 0, y: 0, z: 0 };
+    if (debug) {
+      return;
+    }
 
-          v ||=
-            Math.sqrt(
-              (x - spherePosition.x) * (x - spherePosition.x) +
-              (y - spherePosition.y) * (y - spherePosition.y) +
-              + (z - spherePosition.z) * (z - spherePosition.z)
-            ) < sphereRadius
+    const a1 = {x: triangles[0][1].x - triangles[0][0].x, y: triangles[0][1].y - triangles[0][0].y, z: triangles[0][1].z - triangles[0][0].z }
+    const b1 = {x: triangles[0][2].x - triangles[0][0].x, y: triangles[0][2].y - triangles[0][0].y, z: triangles[0][2].z - triangles[0][0].z }
+    const n1 = { x: a1.y * b1.z - a1.z * b1.y, y: a1.z * b1.x - a1.x * b1.z, z: a1.x * b1.y - a1.y * b1.x};
 
-          v ||=
-            Math.sqrt(
-              (x - spherePosition.x) * (x - spherePosition.x) +
-              (y - spherePosition.y) * (y - spherePosition.y) +
-              + (z - spherePosition.z) * (z - spherePosition.z)
-            ) < sphereRadius && !(noise.noise3D(x / 32, y / 32, z / 32) + noise.noise3D(x / 16, y / 16, z / 16) >= 0.5);
+    const a2 = {x: triangles[1][1].x - triangles[1][0].x, y: triangles[1][1].y - triangles[1][0].y, z: triangles[1][1].z - triangles[1][0].z }
+    const b2 = {x: triangles[1][2].x - triangles[1][0].x, y: triangles[1][2].y - triangles[1][0].y, z: triangles[1][2].z - triangles[1][0].z }
+    const n2 = { x: a2.y * b2.z - a2.z * b2.y, y: a2.z * b2.x - a2.x * b2.z, z: a2.x * b2.y - a2.y * b2.x};
 
-          v ||= Math.random() <= 0.01;
-          v ||= (x == 3) && z === 3;
-          v ||= (x == 3) && y === 3;
-          v ||= (z == 3) && y === 3;
+    const diff = Vector3.Dot(new Vector3(n1.x, n1.y, n1.z).normalize(), new Vector3(n2.x, n2.y, n2.z).normalize());
 
-          v ||= (x == this.size / 2) && z === this.size / 2;
-          v ||= (x == this.size / 2) && y === this.size / 2;
-          v ||= (z == this.size / 2) && y === this.size / 2;
-
-          //v ||= x==10;
-          //v ||= x == 10 && y == 10 && z == 10;
-
-          const cubeRadius = 10;
-          const cubePosition = { x: (this.size - 2) - cubeRadius, y: 2 + cubeRadius, z: (this.size - 2) - cubeRadius };
-
-          v ||=
-            x > (cubePosition.x - cubeRadius) &&
-            x < (cubePosition.x + cubeRadius) &&
-            y > (cubePosition.y - cubeRadius) &&
-            y < (cubePosition.y + cubeRadius) &&
-            z > (cubePosition.z - cubeRadius) &&
-            z < (cubePosition.z + cubeRadius)
-
-          // v||= sdRoundBox(vec3(x, y, z), vec3(this.size/2, this.size/2, this.size/2), 10) < 0;
-
-          v &&= x > 2 && x < this.size - 2 && y > 2 && y < this.size - 2 && z > 2 && z < this.size - 2
-
-          rowy.push({
-            v: v ? "solid" : "gaz",
-            edges: [null, null, null, null, null, null, null, null],
-            edgesConfigs: [null, null, null, null, null, null, null, null],
-            points: [],
-          });
-        }
-
-        rowx.push(rowy);
-      }
-
-      this.data.push(rowx);
+    if (diff < 0.9)
+    {
+      this.meshLines.push([triangles[0][0], triangles[0][2]])
     }
   }
 
-  computeEdges() {
-    for (let x = 1; x < this.size - 1; x++) {
-      for (let y = 1; y < this.size - 1; y++) {
-        for (let z = 1; z < this.size - 1; z++) {
-          const aTopLeft = this.data[x][y][z];
-          const aTopRight = this.data[x + 1][y][z];
-          const bTopLeft = this.data[x][y][z + 1];
-          const bTopRight = this.data[x + 1][y][z + 1];
+  linkEdge(edge1: Point, edge2: Point) {
+    const p1 = this.getPoint(edge1.position.x, edge1.position.y, edge1.position.z);
+    const p2 = this.getPoint(edge2.position.x, edge2.position.y, edge2.position.z);
 
-          const aBottomLeft = this.data[x][y + 1][z];
-          const aBottomRight = this.data[x + 1][y + 1][z];
-          const bBottomLeft = this.data[x][y + 1][z + 1];
-          const bBottomRight = this.data[x + 1][y + 1][z + 1];
+    if (p1 === p2) {
+      return;
+    }
 
+    if (!p1.lines.some(l => is_line(l, p1, p2))) {
+      this.meshLines.push([p1.position, p2.position]);
+
+      const line = { a: p1, b: p2, quads: [] }
+
+      p1.lines.push(line);
+      p2.lines.push(line);
+
+      // search for quad
+
+      for (const p1l of p1.lines) {
+        const p1lp = p1l.a === p1 ? p1l.b : p1l.a;
+
+        for (const p2l of p2.lines) {
+          const p2lp = p2l.a === p2 ? p2l.b : p2l.a;
+
+          if (p1lp !== p2 && p2lp !== p1 && p1lp.lines.some(l => is_line(l, p1lp, p2lp))) {
+
+            this.makeQuad(p1, p2, p2lp, p1lp);
+          }
+        }
+      };
+    }
+  }
+
+
+  sample(x: number, y: number, z: number) {
+    let v = false;
+
+    //         v ||=
+    // noise.noise3D(x / 4, y / 4, z / 4) >=
+    // 0.8;
+
+    // v ||=
+    //   noise.noise3D(x / 8, y / 8, z / 8) +
+    //   noise.noise3D(x / 16, y / 16, z / 16) >=
+    //   0.5;
+
+    //           v ||=
+    //           noise.noise3D(x / 16, y / 16, z / 16) +
+    // noise.noise3D(x / 32, y / 32, z / 32) >=
+    // 0.5;
+
+    // v ||= x === this.size / 2 && y === this.size / 2 && z === this.size / 2;
+
+    //const sphereRadius = 10;
+    //const spherePosition = { x: (this.size - 2) - sphereRadius, y: (this.size - 2) - sphereRadius, z: (this.size - 2) - sphereRadius };
+    //const spherePosition = { x: 0, y: 0, z: 0 };
+
+    const sphereRadius = 20;
+    const spherePosition = { x: this.size / 2, y: this.size / 2, z: this.size / 2 };
+
+    // v ||=
+    //   Math.sqrt(
+    //     (x - spherePosition.x) * (x - spherePosition.x) +
+    //     (y - spherePosition.y) * (y - spherePosition.y) +
+    //     + (z - spherePosition.z) * (z - spherePosition.z)
+    //   ) < sphereRadius
+
+    v ||=
+      Math.sqrt(
+        (x - spherePosition.x) * (x - spherePosition.x) +
+        (y - spherePosition.y) * (y - spherePosition.y) +
+        + (z - spherePosition.z) * (z - spherePosition.z)
+      ) < sphereRadius && !(this.noise.noise3D(x / 32, y / 32, z / 32) + this.noise.noise3D(x / 16, y / 16, z / 16) >= 0.5);
+
+    if (
+      Math.sqrt(
+        (x - spherePosition.x) * (x - spherePosition.x) +
+        (y - spherePosition.y) * (y - spherePosition.y) +
+        + (z - spherePosition.z) * (z - spherePosition.z)
+      ) < sphereRadius - 5) {
+      v = false;
+    }
+
+    v ||= Math.random() <= 0.005;
+
+    //v ||= Math.random() <= 0.01;
+    // v ||= (x === 3) && z === 3;
+    // v ||= (x === 3) && y === 3;
+    // v ||= (z === 3) && y === 3;
+
+    v ||= (x === this.size / 2) && z === this.size / 2;
+    v ||= (x === this.size / 2) && y === this.size / 2;
+    v ||= (z === this.size / 2) && y === this.size / 2;
+
+    //v ||= x==10;
+    //v ||= x === 10 && y === 10 && z === 10;
+
+    const cubeRadius = 10;
+    const cubePosition = { x: (this.size - 2) - cubeRadius, y: 2 + cubeRadius, z: (this.size - 2) - cubeRadius };
+
+    // v ||=
+    //   x > (cubePosition.x - cubeRadius) &&
+    //   x < (cubePosition.x + cubeRadius) &&
+    //   y > (cubePosition.y - cubeRadius) &&
+    //   y < (cubePosition.y + cubeRadius) &&
+    //   z > (cubePosition.z - cubeRadius) &&
+    //   z < (cubePosition.z + cubeRadius)
+
+    // v||= sdRoundBox(vec3(x, y, z), vec3(this.size/2, this.size/2, this.size/2), 10) < 0;
+
+    v &&= x > 2 && x < this.size - 2 && y > 2 && y < this.size - 2 && z > 2 && z < this.size - 2
+
+    return v;
+  }
+
+  setDataType(x: number, y: number, z: number, v: "solid" | "gaz")
+  {
+    return this.data[x * (this.size * this.size) + y * (this.size) + z].v = v;
+  }
+
+  getData(x: number, y: number, z: number)
+  {
+    return this.data[x * (this.size * this.size) + y * (this.size) + z];
+  }
+
+  generate() {
+    for (let x = 0; x < this.size; x++) {
+      for (let y = 0; y < this.size; y++) {
+        for (let z = 0; z < this.size; z++) {
+          this.setDataType(x, y, z, this.sample(x, y, z) ? "solid" : "gaz");
+        }
+      }
+    }
+  }
+
+  compute() {
+    for (let x = 0; x < this.size - 1; x++) {
+      for (let y = 0; y < this.size - 1; y++) {
+        for (let z = 0; z < this.size - 1; z++) {
           const config = [
-            aTopLeft.v,
-            aTopRight.v,
-            bTopLeft.v,
-            bTopRight.v,
-            aBottomLeft.v,
-            aBottomRight.v,
-            bBottomLeft.v,
-            bBottomRight.v,
+            this.getData(x, y, z),
+            this.getData(x + 1, y, z),
+            this.getData(x, y, z + 1),
+            this.getData(x + 1, y, z + 1),
+            this.getData(x, y + 1, z),
+            this.getData(x + 1, y + 1, z),
+            this.getData(x, y + 1, z + 1),
+            this.getData(x + 1, y + 1, z + 1),
           ]
-            .map((v) => (v === "solid" ? "1" : "0"))
+            .map((d) => (d.v === "solid" ? "1" : "0"))
             .join("");
 
           const configIndex = configIndexToStr.findIndex((v) => v === config);
@@ -271,7 +394,7 @@ export class Terrain {
               const cornerPos = cornerIndexToPosition[i];
 
               const corner =
-                this.data[x + cornerPos.x][y + cornerPos.y][z + cornerPos.z];
+                this.getData(x + cornerPos.x, y + cornerPos.y, z + cornerPos.z);
 
               corner.edgesConfigs[cornerIndexToEdgeIndex[i]] = config;
 
@@ -288,168 +411,110 @@ export class Terrain {
               }
             }
           }
-        }
-      }
-    }
-  }
 
-  makeQuad(p1: Point, p2: Point, p3: Point, p4: Point) {
-    const quad: Quad = {points: [p1, p2, p3, p4]};
+          if (x > 1 && y > 1 && z > 1) {
 
-    p1.quad = quad;
-    p2.quad = quad;
-    p4.quad = quad;
-    p4.quad = quad;
+          const cornerData = this.getData(x, y, z);
 
-    const d1 = distance(p1.position, p3.position);
-    const d2 = distance(p2.position, p4.position);
-
-    if (d1 < d2) {
-      this.triangles.push([p1.position, p2.position, p3.position], [p3.position, p4.position, p1.position])
-    } else if (d2 < d1) {
-      this.triangles.push([p2.position, p3.position, p4.position], [p4.position, p1.position, p2.position])
-    } else {
-      this.triangles.push([p1.position, p2.position, p4.position], [p2.position, p3.position, p4.position]);
-    }
-  }
-
-  linkEdge(edge1: Point, edge2: Point) {
-    const p1 = this.getPoint(edge1.position.x, edge1.position.y, edge1.position.z);
-    const p2 = this.getPoint(edge2.position.x, edge2.position.y, edge2.position.z);
-
-    if (!p1.links.includes(p2)) {
-      p1.links.push(p2);
-      p2.links.push(p1);
-
-      // search for quad
-
-      for (const p1l of p1.links) {
-        for (const p2l of p2.links) {
-          if (p1l !== p2 && p2l !== p1 && p1l.links.includes(p2l)) {
-            this.makeQuad(p1, p2, p2l, p1l);
+          if (!cornerData.edgesConfigs.some(c => c !== "00000000" && c !== "11111111" && c !== null)) {
+            continue;
           }
-        }
-      }
 
-      this.meshLines.push([p1.position, p2.position]);
-    }
-  }
+          [1, -1].forEach((sign) => {
+            ["x", "y", "z"].forEach((axis) => {
+              const selfAxisCornerIndexes = cornerIndexToPosition
+                .map((c, i) => (c[axis] === (sign === -1 ? 1 : 0) ? i : -1)) // -1 c'est 1 car  [0    1]X[0    1]  
+                .filter((i) => i >= 0);
 
-  computeLines() {
-    for (let x = 1; x < this.size - 1; x++) {
-      for (let y = 1; y < this.size - 1; y++) {
-        for (let z = 1; z < this.size - 1; z++) {
-          const cornerData = this.data[x][y][z];
+              if (selfAxisCornerIndexes.length !== 4) {
+                throw new Error();
+              }
 
-          // if (!(x % 10 === 0 && y % 10 === 0 && z % 10 === 0)) {
-          //   continue;
-          // }
+              const revertedSelfAxisCornerIndexes = cornerIndexToPosition
+                .map((c, i) => (c[axis] === (sign === -1 ? 0 : 1) ? i : -1)) // -1 c'est 1 car  [0    1]X[0    1]  
+                .filter((i) => i >= 0);
 
-          if (cornerData.edgesConfigs.some(c => c !== "00000000" && c !== "11111111" && c !== null)) {
+              if (revertedSelfAxisCornerIndexes.length !== 4) {
+                throw new Error();
+              }
 
-            [1, -1].forEach((sign) => {
-              ["x", "y", "z"].forEach((axis) => {
-                const selfAxisCornerIndexes = cornerIndexToPosition
-                  .map((c, i) => (c[axis] === (sign === -1 ? 1 : 0) ? i : -1)) // -1 c'est 1 car  [0    1]X[0    1]  
-                  .filter((i) => i >= 0);
+              for (const selfAxisCornerIndex of selfAxisCornerIndexes) {
+                const selfEdge =
+                  cornerData.edges[cornerIndexToEdgeIndex[selfAxisCornerIndex]];
 
-                if (selfAxisCornerIndexes.length !== 4) {
-                  throw new Error();
-                }
+                if (selfEdge) {
 
-                const revertedSelfAxisCornerIndexes = cornerIndexToPosition
-                  .map((c, i) => (c[axis] === (sign === -1 ? 0 : 1) ? i : -1)) // -1 c'est 1 car  [0    1]X[0    1]  
-                  .filter((i) => i >= 0);
+                  this.ownerLines.push([
+                    { x, y, z },
+                    {
+                      x: selfEdge.position.x,
+                      y: selfEdge.position.y,
+                      z: selfEdge.position.z,
+                    }
+                  ]);
 
-                if (revertedSelfAxisCornerIndexes.length !== 4) {
-                  throw new Error();
-                }
+                  ["x", "y", "z"]
+                    .filter((a) => axis !== a)
+                    .map((otherAxis) => {
+                      const lastAxis = ["x", "y", "z"].find(
+                        (a) => a !== axis && a !== otherAxis
+                      );
 
-                for (const selfAxisCornerIndex of selfAxisCornerIndexes) {
-                  const selfEdge =
-                    cornerData.edges[cornerIndexToEdgeIndex[selfAxisCornerIndex]];
-
-                  if (selfEdge) {
-
-                    this.ownerLines.push([
-                      { x, y, z },
-                      {
-                        x: selfEdge.position.x,
-                        y: selfEdge.position.y,
-                        z: selfEdge.position.z,
+                      if (lastAxis === undefined) {
+                        throw new Error("tf1");
                       }
-                    ]);
 
-                    ["x", "y", "z"]
-                      .filter((a) => axis !== a)
-                      .map((otherAxis) => {
-                        const lastAxis = ["x", "y", "z"].find(
-                          (a) => a !== axis && a !== otherAxis
-                        );
+                      const otherCornerIndex = selfAxisCornerIndexes.find(
+                        (i) =>
+                          cornerIndexToPosition[selfAxisCornerIndex][otherAxis] !== cornerIndexToPosition[i][otherAxis] &&
+                          cornerIndexToPosition[selfAxisCornerIndex][lastAxis] === cornerIndexToPosition[i][lastAxis]
+                      )!;
 
-                        if (lastAxis === undefined) {
-                          throw new Error("tf1");
-                        }
+                      if (otherCornerIndex === undefined) {
+                        throw new Error("tf2");
+                      }
 
-                        const otherCornerIndex = selfAxisCornerIndexes.find(
-                          (i) =>
-                            cornerIndexToPosition[selfAxisCornerIndex][
-                            otherAxis
-                            ] !== cornerIndexToPosition[i][otherAxis] &&
-                            cornerIndexToPosition[selfAxisCornerIndex][
-                            lastAxis
-                            ] === cornerIndexToPosition[i][lastAxis]
-                        )!;
+                      const otherEdge =
+                        cornerData.edges[
+                        cornerIndexToEdgeIndex[otherCornerIndex]
+                        ];
 
-                        if (otherCornerIndex === undefined) {
+                      if (otherEdge) {
+                        this.linkEdge(selfEdge, otherEdge);
+                      }
+
+                      {
+                        const farOpposedCornerIndex =
+                          revertedSelfAxisCornerIndexes.find(
+                            (i) =>
+                              cornerIndexToPosition[selfAxisCornerIndex][otherAxis] === cornerIndexToPosition[i][otherAxis] &&
+                              cornerIndexToPosition[selfAxisCornerIndex][lastAxis] !== cornerIndexToPosition[i][lastAxis]
+                          )!;
+
+                        if (farOpposedCornerIndex === undefined) {
                           throw new Error("tf2");
                         }
 
-                        const otherEdge =
-                          cornerData.edges[
-                          cornerIndexToEdgeIndex[otherCornerIndex]
+                        const farOpposedCornerData =
+                          this.getData(x + (axis === "x" ? sign : 0), 
+                          y + (axis === "y" ? sign : 0)
+                          , z + (axis === "z" ? sign : 0));
+
+                        const farOpposedEdge =
+                          farOpposedCornerData.edges[
+                          cornerIndexToEdgeIndex[farOpposedCornerIndex]
                           ];
 
-                        if (otherEdge) {
-                          this.linkEdge(selfEdge, otherEdge);
+                        if (farOpposedEdge) {
+                          this.linkEdge(selfEdge, farOpposedEdge);
                         }
-
-                        {
-                          const farOpposedCornerIndex =
-                            revertedSelfAxisCornerIndexes.find(
-                              (i) =>
-                                cornerIndexToPosition[selfAxisCornerIndex][
-                                otherAxis
-                                ] === cornerIndexToPosition[i][otherAxis] &&
-                                cornerIndexToPosition[selfAxisCornerIndex][
-                                lastAxis
-                                ] !== cornerIndexToPosition[i][lastAxis]
-                            )!;
-
-                          if (farOpposedCornerIndex === undefined) {
-                            throw new Error("tf2");
-                          }
-
-                          const farOpposedCornerData =
-                            this.data[x + (axis === "x" ? sign : 0)][
-                            y + (axis === "y" ? sign : 0)
-                            ][z + (axis === "z" ? sign : 0)];
-
-
-                          const farOpposedEdge =
-                            farOpposedCornerData.edges[
-                            cornerIndexToEdgeIndex[farOpposedCornerIndex]
-                            ];
-
-                          if (farOpposedEdge) {
-                            this.linkEdge(selfEdge, farOpposedEdge);
-                          }
-                        }
-                      });
-                  }
+                      }
+                    });
                 }
-              });
+              }
             });
+          });
+        
           }
         }
       }
@@ -460,10 +525,10 @@ export class Terrain {
     for (let x = 0; x < this.size - 1; x++) {
       for (let y = 0; y < this.size - 1; y++) {
         for (let z = 0; z < this.size - 1; z++) {
-          const corner = this.data[x][y][z];
+          const corner = this.getData(x, y, z);
 
           if (corner.edgesConfigs.some(c => c !== "00000000" && c !== "11111111" && c !== null)) {
-            if (this.data[x][y][z].v === "solid") {
+            if (corner.v === "solid") {
               const mesh = this.cubeMesh.createInstance(`lol`);
 
               mesh.parent = this.root;
@@ -497,7 +562,7 @@ export class Terrain {
       for (let y = 0; y < this.size; y++) {
         for (let z = 0; z < this.size; z++) {
           for (let i = 0; i < 8; i++) {
-            const cornerData = this.data[x][y][z];
+            const cornerData = this.getData(x, y, z);
 
             for (const point of cornerData.points) {
               const mesh = this.cubeMesh.createInstance(`lol`);
@@ -519,6 +584,7 @@ export class Terrain {
 
 
   drawMeshLines() {
+
     const customMesh = MeshBuilder.CreateLineSystem(
       "lineSystem",
       {
@@ -530,8 +596,19 @@ export class Terrain {
     );
 
     customMesh.parent = this.root;
+    customMesh.color = new Color3(0, 0.9, 1).scale(0.8);
 
-    customMesh.color = Color3.Yellow();
+    const i2 = customMesh.createInstance('l');
+    i2.position.set(0.01, 0, 0);
+    i2.parent = this.root;
+
+    const i3 = customMesh.createInstance('l');
+    i3.position.set(0, 0.01, 0);
+    i3.parent = this.root;
+
+    const i4 = customMesh.createInstance('l');
+    i4.position.set(0, 0, 0.01);
+    i4.parent = this.root;
   }
 
   drawOwnerLines() {
@@ -541,6 +618,7 @@ export class Terrain {
         lines: this.ownerLines.map((l) =>
           l.map((li) => new Vector3(li.x, li.y, li.z))
         ),
+
       },
       this.scene
     );
@@ -566,9 +644,7 @@ export class Terrain {
     customMesh.color = Color3.White();
   }
 
-  drawTriangles() {
-    console.log("draw triangles");
-
+  draw() {
     const customMesh = new Mesh("custom", this.scene);
 
     customMesh.parent = this.root;
@@ -605,7 +681,7 @@ export class Terrain {
 
     const mat = new StandardMaterial("mat", this.scene);
     mat.backFaceCulling = false;
-    mat.diffuseColor = Color3.Yellow();
+    mat.diffuseColor = Color3.Black();
     //mat.wireframe = true;
     customMesh.material = mat;
   }
