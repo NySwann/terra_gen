@@ -21,11 +21,10 @@ type Configuration = [
 ];
 type ConfigurationStr = string;
 
-export const configIndexToStr: ConfigurationStr[] =
-  precomputed_configIndexToStr;
-export const configIndexToEdgePositions: {
+export let configIndexToStr: ConfigurationStr[] = []
+export let configIndexToEdgePositions: {
   [key: number]: (Position | null)[];
-} = precomputed_configIndexToEdgePositions;
+} = {};
 
 export const cornerIndexToPosition = [
   { x: 0, y: 0, z: 0 }, //
@@ -75,7 +74,7 @@ const balancedConfigurations = [
 
 export class Table {
   scene: Scene;
-  selectedConfig: number;
+  debugConfig: number;
   sphereMesh: Mesh;
 
   constructor(scene: Scene) {
@@ -92,30 +91,36 @@ export class Table {
     this.sphereMesh.registerInstancedBuffer("color", 4);
     this.sphereMesh.instancedBuffers.color = new Color4(0.2, 0.6, 0.4, 1.0);
 
-    // this.generateConfig(1, 1, [0, 0, 0, 0, 0, 0, 0, 0]);
-    // this.generateConfig(1, 2, [0, 0, 0, 0, 0, 0, 0, 0]);
-    // this.generateConfig(1, 3, [0, 0, 0, 0, 0, 0, 0, 0]);
-    // this.generateConfig(1, 4, [0, 0, 0, 0, 0, 0, 0, 0]);
-    // this.generateConfig(1, 5, [0, 0, 0, 0, 0, 0, 0, 0]);
-    // this.generateConfig(1, 6, [0, 0, 0, 0, 0, 0, 0, 0]);
-    // this.generateConfig(1, 7, [0, 0, 0, 0, 0, 0, 0, 0]);
+    // configIndexToStr = precomputed_configIndexToStr;
+    // configIndexToEdgePositions = precomputed_configIndexToEdgePositions;
 
-    // for (const c of configIndexToStr) {
-    //   //console.log(c);
+    configIndexToStr = [];
+    configIndexToEdgePositions = {}
 
-    //   this.generateEdges(configIndexToStr.indexOf(c));
-    // }
+    this.generateConfig(1, 1, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 2, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 3, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 4, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 5, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 6, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 7, [0, 0, 0, 0, 0, 0, 0, 0]);
+
+    this.debugConfig = configIndexToStr.findIndex((d) => d == "11010110");
+
+    for (const c of configIndexToStr) {
+      //console.log(c);
+
+      this.generateEdges(configIndexToStr.indexOf(c));
+    }
 
     // console.log(JSON.stringify(configIndexToStr, null, 2));
     // console.log(JSON.stringify(configIndexToEdgePositions, null, 2));
 
     //console.log(configIndexToStr.length);
 
-    this.selectedConfig = configIndexToStr.findIndex((d) => d == "11001000");
-
     //console.log(this.selectedConfig);
 
-    // this.visualize();
+    this.visualize();
 
     this.sphereMesh.position.set(100, 100, 100);
   }
@@ -226,24 +231,77 @@ export class Table {
 
     const count1 = config.split("").filter((c) => c === "1").length;
     const count0 = config.split("").filter((c) => c === "0").length;
-    const of = count1 <= count0 ? "1" : "0";
+    let of = count1 <= count0 ? "1" : "0";
+
+    if (selectedConfig === this.debugConfig) {
+      console.log(config);
+      console.log(of);
+      console.log("allo merde");
+    }
 
     // corner index
     for (let x = 0; x < 8; x++) {
-      if (config[x] === of) {
-        const cluster = [x];
+      const cluster = [x];
 
-        let edgePosition: Position;
+      let edgePosition: Position | null = null;
 
-        this.deepSearchClusters(of, selectedConfig, x, cluster);
+      this.deepSearchClusters(config[x], selectedConfig, x, cluster);
 
-        if (config === "11111110") {
-          console.log(config);
-          console.log(count1, count0);
-          console.log(of);
-          console.log(cluster);
+      let f = 0;
+
+      if (count1 == 5 && [0, 1, 2, 3, 4, 5, 6, 7].some(i => {
+        const cluster2 = [i];
+        this.deepSearchClusters(config[i], selectedConfig, i, cluster2);
+
+        if (config[i] === "1" && cluster2.length === 1) {
+          f = i;
+          return true;
         }
+        return false;
+      })) {
+        if (cluster.length === 1 && config[x] === '1') {
+          edgePosition = {
+            x: cornerIndexToGrab[cluster[0]].x * 1.5,
+            y: cornerIndexToGrab[cluster[0]].y * 1.5,
+            z: cornerIndexToGrab[cluster[0]].z * 1.5,
+          };
+        }
+        else if (cluster.length === 1 && config[x] === '0') {
+          const trickCluster = [x];
+          const fakeConfigA = config.split("");
 
+          fakeConfigA[f] = '0';
+
+          const fakeConfig = fakeConfigA.join("");
+          console.log(fakeConfig);
+          const fakeSelectedConfig = configIndexToStr.findIndex(c => c === fakeConfig)!;
+
+          this.deepSearchClusters('0', fakeSelectedConfig, x, trickCluster);
+
+          if (trickCluster.length !== 4 ) {
+            throw new Error();
+          }
+
+          const clusterGrabs = trickCluster.map((i) => cornerIndexToGrab[i]);
+
+          edgePosition = {
+            x:
+              clusterGrabs.reduce((acc, v) => acc + v.x, 0) /
+              clusterGrabs.length,
+            y:
+              clusterGrabs.reduce((acc, v) => acc + v.y, 0) /
+              clusterGrabs.length,
+            z:
+              clusterGrabs.reduce((acc, v) => acc + v.z, 0) /
+              clusterGrabs.length,
+          };
+        }  else if (cluster.length === 4 && config[x] === '1') {
+
+        }
+      }
+
+
+      else if (config[x] === of) {
         if (balancedConfigurations.includes(config) || cluster.length === 4) {
           edgePosition = { x: 0, y: 0, z: 0 };
         } else if (cluster.length === 1) {
@@ -252,7 +310,7 @@ export class Table {
             y: cornerIndexToGrab[cluster[0]].y * 1.5,
             z: cornerIndexToGrab[cluster[0]].z * 1.5,
           };
-        } else {
+        } else if (config[x] === of) {
           const clusterGrabs = cluster.map((i) => cornerIndexToGrab[i]);
 
           edgePosition = {
@@ -267,7 +325,13 @@ export class Table {
               clusterGrabs.length,
           };
         }
+      }
 
+      if (selectedConfig === this.debugConfig) {
+        console.log(edgePosition)
+      }
+
+      if (edgePosition) {
         if (!configIndexToEdgePositions[selectedConfig]) {
           configIndexToEdgePositions[selectedConfig] = [
             null,
@@ -287,14 +351,14 @@ export class Table {
   }
 
   visualize() {
-    if (this.selectedConfig == -1) {
+    if (this.debugConfig == -1) {
       console.error("-1");
       return;
     }
 
-    const p = {x: 0.0, y: 0.0, z: 0.0};
+    const p = { x: 0.0, y: 0.0, z: 50.0 };
 
-    const config = configIndexToStr[this.selectedConfig];
+    const config = configIndexToStr[this.debugConfig];
 
     console.log(config);
 
@@ -313,25 +377,25 @@ export class Table {
         config[x] === "1" ? new Color4(1, 1, 1, 1) : new Color4(0, 0, 1, 1);
 
       const text = MeshBuilder.CreateText(
-      "myText",
-      JSON.stringify(position),
-      fontData,
-      {
-        size: 0.06,
-        depth: 0.01,
-        resolution: 6,
-      },
-      this.scene,
-      earcut
+        "myText",
+        JSON.stringify(position),
+        fontData,
+        {
+          size: 0.06,
+          depth: 0.01,
+          resolution: 6,
+        },
+        this.scene,
+        earcut
       )!;
 
       text.position.x = position.x + p.x;
       text.position.y = position.y + p.y + 0.5;
-     text.position.z = position.z + p.z;  
+      text.position.z = position.z + p.z;
 
-      const ce = configIndexToEdgePositions[this.selectedConfig];
+      const ce = configIndexToEdgePositions[this.debugConfig];
 
-      if (ce && config[x] === "1") {
+      if (ce) {
         const e = ce[x];
 
         if (e) {
