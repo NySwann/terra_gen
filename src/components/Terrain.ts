@@ -767,7 +767,7 @@ export class Terrain {
     );
 
     customMesh.parent = this.rendered;
-    customMesh.color = new Color3(0, 0.9, 1).scale(0.8);
+    customMesh.color = new Color3(.2, 0.8, 1).scale(0.9);
 
     const i2 = customMesh.createInstance('l');
     i2.position.set(0.01, 0, 0);

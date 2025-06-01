@@ -91,30 +91,30 @@ export class Table {
     this.sphereMesh.registerInstancedBuffer("color", 4);
     this.sphereMesh.instancedBuffers.color = new Color4(0.2, 0.6, 0.4, 1.0);
 
-    // configIndexToStr = precomputed_configIndexToStr;
-    // configIndexToEdgePositions = precomputed_configIndexToEdgePositions;
+    configIndexToStr = precomputed_configIndexToStr;
+    configIndexToEdgePositions = precomputed_configIndexToEdgePositions;
 
-    configIndexToStr = [];
-    configIndexToEdgePositions = {}
+    // configIndexToStr = [];
+    // configIndexToEdgePositions = {}
 
-    this.generateConfig(1, 1, [0, 0, 0, 0, 0, 0, 0, 0]);
-    this.generateConfig(1, 2, [0, 0, 0, 0, 0, 0, 0, 0]);
-    this.generateConfig(1, 3, [0, 0, 0, 0, 0, 0, 0, 0]);
-    this.generateConfig(1, 4, [0, 0, 0, 0, 0, 0, 0, 0]);
-    this.generateConfig(1, 5, [0, 0, 0, 0, 0, 0, 0, 0]);
-    this.generateConfig(1, 6, [0, 0, 0, 0, 0, 0, 0, 0]);
-    this.generateConfig(1, 7, [0, 0, 0, 0, 0, 0, 0, 0]);
+    // this.generateConfig(1, 1, [0, 0, 0, 0, 0, 0, 0, 0]);
+    // this.generateConfig(1, 2, [0, 0, 0, 0, 0, 0, 0, 0]);
+    // this.generateConfig(1, 3, [0, 0, 0, 0, 0, 0, 0, 0]);
+    // this.generateConfig(1, 4, [0, 0, 0, 0, 0, 0, 0, 0]);
+    // this.generateConfig(1, 5, [0, 0, 0, 0, 0, 0, 0, 0]);
+    // this.generateConfig(1, 6, [0, 0, 0, 0, 0, 0, 0, 0]);
+    // this.generateConfig(1, 7, [0, 0, 0, 0, 0, 0, 0, 0]);
 
     this.debugConfig = configIndexToStr.findIndex((d) => d == "11010110");
 
-    for (const c of configIndexToStr) {
-      //console.log(c);
+    // for (const c of configIndexToStr) {
+    //   //console.log(c);
 
-      this.generateEdges(configIndexToStr.indexOf(c));
-    }
+    //   this.generateEdges(configIndexToStr.indexOf(c));
+    // }
 
-    // console.log(JSON.stringify(configIndexToStr, null, 2));
-    // console.log(JSON.stringify(configIndexToEdgePositions, null, 2));
+    //console.log(JSON.stringify(configIndexToStr, null, 2));
+    //console.log(JSON.stringify(configIndexToEdgePositions, null, 2));
 
     //console.log(configIndexToStr.length);
 
