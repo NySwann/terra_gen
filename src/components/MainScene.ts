@@ -45,6 +45,6 @@ export default class MainScene {
   async loadComponents(): Promise<void> {
     // Load your files in order
     new Table(this.scene);
-    new Terrain(this.scene);
+    new Terrain(this.scene, this.camera);
   }
 }

@@ -10,6 +10,7 @@ import {
   MeshBuilder,
   StandardMaterial,
   TransformNode,
+  Vector2,
   Vector3,
   VertexData,
 } from "@babylonjs/core";
@@ -32,16 +33,9 @@ interface Line {
 }
 
 interface Point {
-  position: Position;
+  position: Vector3;
   lines: Line[];
 }
-
-interface Position {
-  x: number;
-  y: number;
-  z: number;
-}
-
 type Material = "gaz" | "solid";
 
 interface Block {
@@ -76,11 +70,15 @@ function is_line(l: Line, p1: Point, p2: Point) {
   return (l.a === p1 && l.b === p2) || (l.a === p2 && l.b === p1);
 }
 
+function is_zero(v: Vector3) {
+  return eqn(v.x, 0) && eqn(v.y, 0) && eqn(v.x, 0);
+}
+
 function eqn(a: number, b: number) {
   return Math.abs(a - b) < 0.00001;
 }
 
-function distance(a: Position, b: Position) {
+function distance(a: Vector3, b: Vector3) {
   return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) + (a.z - b.z) * (a.z - b.z));
 }
 
@@ -97,6 +95,7 @@ function sfc32(a, b, c, d) {
   }
 }
 
+
 let lines = true;
 let debug = false;
 
@@ -109,16 +108,18 @@ export class Terrain {
   voxels: Voxel[];
   cubeMesh: Mesh;
   transparentSphereMesh: Mesh;
-  triangles: [Position, Position, Position][];
-  meshLines: [Position, Position][];
-  ownerLines: [Position, Position][];
-  debugLines: [Position, Position][];
+  triangles: [Vector3, Vector3, Vector3][];
+  meshLines: [Vector3, Vector3][];
+  ownerLines: [Vector3, Vector3][];
+  debugLines: [Vector3, Vector3][];
   root: TransformNode;
   rendered: TransformNode;
   random: () => number;
+  selectorMesh: Mesh;
 
   constructor(scene: Scene, camera: Camera) {
     this.scene = scene;
+    this.camera = camera;
 
     this.size = 50;
     this.blocks = new Array(this.size * this.size * this.size).fill(null).map(() => ({
@@ -162,20 +163,34 @@ export class Terrain {
 
     const selectorMesh = MeshBuilder.CreateBox(
       "sphere",
-      { size: 1 },
+      { size: 0.5 },
       this.scene
     );
-
     selectorMesh.isPickable = false;
     const selectorMeshMaterial = new StandardMaterial("", this.scene);
     selectorMeshMaterial.diffuseColor = Color3.Yellow();
     selectorMesh.material = selectorMeshMaterial;
-
     selectorMesh.parent = this.root;
+    selectorMesh.renderOutline = true;
+    selectorMesh.forceRenderingWhenOccluded = true;
+    selectorMesh.renderingGroupId = 1.0;
 
-    let lastPos: Position | null = null;
+    this.selectorMesh = selectorMesh;
 
-    scene.onPointerMove = () => {
+    const selectorMesh2 = MeshBuilder.CreateBox(
+      "sphere",
+      { size: 0.2 },
+      this.scene
+    );
+    selectorMesh2.isPickable = false;
+    const selectorMeshMaterial2 = new StandardMaterial("", this.scene);
+    selectorMeshMaterial2.diffuseColor = Color3.Red();
+    selectorMesh2.material = selectorMeshMaterial2;
+    selectorMesh2.parent = this.root;
+
+    let lastPos: Vector3 | null = null;
+
+    scene.onPointerMove = (e) => {
       if (new Date().getTime() - lastPick.getTime() < 16) {
         return;
       }
@@ -183,16 +198,66 @@ export class Terrain {
       lastPick = new Date();
 
       const ray = scene.createPickingRay(scene.pointerX, scene.pointerY, Matrix.Identity(), camera);
-      const hit = scene.pickWithRay(ray);
 
-      if (hit?.pickedPoint) {
-        const position = { x: Math.round(hit.pickedPoint?.x - this.root.position.x), y: Math.round(hit.pickedPoint?.y - this.root.position.y), z: Math.round(hit.pickedPoint?.z - this.root.position.z), }
+      // const hit = scene.pickWithRay(ray);
 
-        lastPos = position;
+      // if (hit?.pickedPoint) {
+      //   const position = new Vector3(Math.round(hit.pickedPoint?.x - this.root.position.x), Math.round(hit.pickedPoint?.y - this.root.position.y), Math.round(hit.pickedPoint?.z - this.root.position.z));
 
-        //console.log(position);
+      //   lastPos = position;
 
-        selectorMesh.position.set(position.x, position.y, position.z);
+      //   //console.log(position);
+
+      //   //selectorMesh.position.set(position.x, position.y, position.z);
+      // }
+
+      // const cameraViewport = camera.viewport;
+      // const viewport = cameraViewport.toGlobal(this.scene.getEngine().getRenderWidth(), this.scene.getEngine().getRenderHeight());
+
+      // // Moving coordinates to local viewport world
+      // const x = this.scene.pointerX / this.scene.getEngine().getHardwareScalingLevel() - viewport.x;
+      // const y = this.scene.pointerY / this.scene.getEngine().getHardwareScalingLevel() - (this.scene.getEngine().getRenderHeight() - viewport.y - viewport.height);
+
+      // const origin = Vector3.Unproject(
+      //                   new Vector3(x, y, 0),
+      //       	          this.scene.getEngine().getRenderWidth(),
+      //                   this.scene.getEngine().getRenderHeight(),
+      //                   Matrix.Identity(), scene.getViewMatrix(),
+      //                   scene.getProjectionMatrix());
+
+      // selectorMesh.position.set(origin.x, origin.y, origin.z);
+
+      const owner = selectorMesh.parent!;
+
+      owner.computeWorldMatrix();
+      const matrix = Matrix.Identity();
+      owner.getWorldMatrix().invertToRef(matrix);
+      const o = Vector3.TransformCoordinates(ray.origin, matrix);
+      //selectorMesh.position.set(o.x, o.y, o.z);
+
+      console.log(o);
+
+      const d = Vector3.TransformNormal(ray.direction, matrix);
+      const far = o.add(d.scale(10));
+      //selectorMesh2.position.set(far.x, far.y, far.z);
+
+      //const wm = this.root.getWorldMatrix();
+
+     // wm.invert();
+
+      // const o = Vector3.TransformCoordinates(origin, wm);
+
+      // //selectorMesh.position.set(o.x, o.y, o.z);
+
+      // const d = Vector3.TransformNormal(ray.direction, wm);
+
+      const rayz = {origin: o, direction: d};
+
+      const hitz = amanatidesWooAlgorithm(rayz, this, 0.0, 1.0);
+
+      if (hitz) {
+        lastPos = hitz;
+        this.selectorMesh.position.set(lastPos.x, lastPos.y, lastPos.z);
       }
     }
 
@@ -266,6 +331,10 @@ export class Terrain {
     return this.voxels[x * (this.size * this.size) + y * (this.size) + z];
   }
 
+  getVoxelPosFromFloat(x: number, y: number, z: number) {
+    return new Vector3(Math.floor(x), Math.floor(y), Math.floor(z));
+  }
+
   getBlock(x: number, y: number, z: number) {
     return this.blocks[x * (this.size * this.size) + y * (this.size) + z];
   }
@@ -283,6 +352,18 @@ export class Terrain {
     this.render();
   }
 
+  minBound(): Vector3 {
+    return new Vector3(1, 1, 1);
+  }
+
+  maxBound(): Vector3 {
+    return new Vector3(this.size, this.size, this.size);
+  }
+
+  voxelSize(): Vector3 {
+    return new Vector3(1, 1, 1);
+  }
+
   getPoint(x: number, y: number, z: number): Point {
     const voxel = this.getVoxel(Math.floor(x), Math.floor(y), Math.floor(z));
 
@@ -298,7 +379,7 @@ export class Terrain {
       }
     }
 
-    const point = { position: { x, y, z }, lines: [] };
+    const point = { position: new Vector3( x, y, z ), lines: [] };
 
     voxel.points.push(point);
 
@@ -336,13 +417,13 @@ export class Terrain {
       return;
     }
 
-    const a1 = { x: triangles[0][1].x - triangles[0][0].x, y: triangles[0][1].y - triangles[0][0].y, z: triangles[0][1].z - triangles[0][0].z }
-    const b1 = { x: triangles[0][2].x - triangles[0][0].x, y: triangles[0][2].y - triangles[0][0].y, z: triangles[0][2].z - triangles[0][0].z }
-    const n1 = { x: a1.y * b1.z - a1.z * b1.y, y: a1.z * b1.x - a1.x * b1.z, z: a1.x * b1.y - a1.y * b1.x };
+    const a1 = new Vector3(triangles[0][1].x - triangles[0][0].x,  triangles[0][1].y - triangles[0][0].y,  triangles[0][1].z - triangles[0][0].z )
+    const b1 = new Vector3(triangles[0][2].x - triangles[0][0].x,  triangles[0][2].y - triangles[0][0].y,  triangles[0][2].z - triangles[0][0].z )
+    const n1 = new Vector3(a1.y * b1.z - a1.z * b1.y,  a1.z * b1.x - a1.x * b1.z,  a1.x * b1.y - a1.y * b1.x );
 
-    const a2 = { x: triangles[1][1].x - triangles[1][0].x, y: triangles[1][1].y - triangles[1][0].y, z: triangles[1][1].z - triangles[1][0].z }
-    const b2 = { x: triangles[1][2].x - triangles[1][0].x, y: triangles[1][2].y - triangles[1][0].y, z: triangles[1][2].z - triangles[1][0].z }
-    const n2 = { x: a2.y * b2.z - a2.z * b2.y, y: a2.z * b2.x - a2.x * b2.z, z: a2.x * b2.y - a2.y * b2.x };
+    const a2 = new Vector3(triangles[1][1].x - triangles[1][0].x,  triangles[1][1].y - triangles[1][0].y,  triangles[1][1].z - triangles[1][0].z )
+    const b2 = new Vector3(triangles[1][2].x - triangles[1][0].x,  triangles[1][2].y - triangles[1][0].y,  triangles[1][2].z - triangles[1][0].z )
+    const n2 = new Vector3(a2.y * b2.z - a2.z * b2.y,  a2.z * b2.x - a2.x * b2.z,  a2.x * b2.y - a2.y * b2.x );
 
     const diff = Vector3.Dot(new Vector3(n1.x, n1.y, n1.z).normalize(), new Vector3(n2.x, n2.y, n2.z).normalize());
 
@@ -404,31 +485,31 @@ export class Terrain {
     // v ||= x === this.size / 2 && y === this.size / 2 && z === this.size / 2;
 
     //const sphereRadius = 10;
-    //const spherePosition = { x: (this.size - 2) - sphereRadius, y: (this.size - 2) - sphereRadius, z: (this.size - 2) - sphereRadius };
-    //const spherePosition = { x: 0, y: 0, z: 0 };
+    //const sphereVector3 = { x: (this.size - 2) - sphereRadius, y: (this.size - 2) - sphereRadius, z: (this.size - 2) - sphereRadius };
+    //const sphereVector3 = { x: 0, y: 0, z: 0 };
 
     const sphereRadius = 20;
-    const spherePosition = { x: this.size / 2, y: this.size / 2, z: this.size / 2 };
+    const sphereVector3 = { x: this.size / 2, y: this.size / 2, z: this.size / 2 };
 
     // v ||=
     //   Math.sqrt(
-    //     (x - spherePosition.x) * (x - spherePosition.x) +
-    //     (y - spherePosition.y) * (y - spherePosition.y) +
-    //     + (z - spherePosition.z) * (z - spherePosition.z)
+    //     (x - sphereVector3.x) * (x - sphereVector3.x) +
+    //     (y - sphereVector3.y) * (y - sphereVector3.y) +
+    //     + (z - sphereVector3.z) * (z - sphereVector3.z)
     //   ) < sphereRadius
 
     v ||=
       Math.sqrt(
-        (x - spherePosition.x) * (x - spherePosition.x) +
-        (y - spherePosition.y) * (y - spherePosition.y) +
-        + (z - spherePosition.z) * (z - spherePosition.z)
+        (x - sphereVector3.x) * (x - sphereVector3.x) +
+        (y - sphereVector3.y) * (y - sphereVector3.y) +
+        + (z - sphereVector3.z) * (z - sphereVector3.z)
       ) < sphereRadius && !(this.noise.noise3D(x / 32, y / 32, z / 32) + this.noise.noise3D(x / 16, y / 16, z / 16) >= 0.5);
 
     if (
       Math.sqrt(
-        (x - spherePosition.x) * (x - spherePosition.x) +
-        (y - spherePosition.y) * (y - spherePosition.y) +
-        + (z - spherePosition.z) * (z - spherePosition.z)
+        (x - sphereVector3.x) * (x - sphereVector3.x) +
+        (y - sphereVector3.y) * (y - sphereVector3.y) +
+        + (z - sphereVector3.z) * (z - sphereVector3.z)
       ) < sphereRadius - 5) {
       v = false;
     }
@@ -440,23 +521,23 @@ export class Terrain {
     // v ||= (x === 3) && y === 3;
     // v ||= (z === 3) && y === 3;
 
-    v ||= (x === this.size / 2) && z === this.size / 2;
-    v ||= (x === this.size / 2) && y === this.size / 2;
-    v ||= (z === this.size / 2) && y === this.size / 2;
+    // v ||= (x === this.size / 2) && z === this.size / 2;
+    // v ||= (x === this.size / 2) && y === this.size / 2;
+    // v ||= (z === this.size / 2) && y === this.size / 2;
 
     //v ||= x==10;
     //v ||= x === 10 && y === 10 && z === 10;
 
     const cubeRadius = 10;
-    const cubePosition = { x: (this.size - 2) - cubeRadius, y: 2 + cubeRadius, z: (this.size - 2) - cubeRadius };
+    const cubeVector3 = { x: (this.size - 2) - cubeRadius, y: 2 + cubeRadius, z: (this.size - 2) - cubeRadius };
 
     // v ||=
-    //   x > (cubePosition.x - cubeRadius) &&
-    //   x < (cubePosition.x + cubeRadius) &&
-    //   y > (cubePosition.y - cubeRadius) &&
-    //   y < (cubePosition.y + cubeRadius) &&
-    //   z > (cubePosition.z - cubeRadius) &&
-    //   z < (cubePosition.z + cubeRadius)
+    //   x > (cubeVector3.x - cubeRadius) &&
+    //   x < (cubeVector3.x + cubeRadius) &&
+    //   y > (cubeVector3.y - cubeRadius) &&
+    //   y < (cubeVector3.y + cubeRadius) &&
+    //   z > (cubeVector3.z - cubeRadius) &&
+    //   z < (cubeVector3.z + cubeRadius)
 
     // v||= sdRoundBox(vec3(x, y, z), vec3(this.size/2, this.size/2, this.size/2), 10) < 0;
 
@@ -469,13 +550,13 @@ export class Terrain {
     let v = false;
 
     const sphereRadius = 10;
-    const spherePosition = { x: 0, y: 0, z: 0 };
+    const sphereVector3 = { x: 0, y: 0, z: 0 };
 
     v ||=
       Math.sqrt(
-        (x - spherePosition.x) * (x - spherePosition.x) +
-        (y - spherePosition.y) * (y - spherePosition.y) +
-        + (z - spherePosition.z) * (z - spherePosition.z)
+        (x - sphereVector3.x) * (x - sphereVector3.x) +
+        (y - sphereVector3.y) * (y - sphereVector3.y) +
+        + (z - sphereVector3.z) * (z - sphereVector3.z)
       ) < sphereRadius;
 
     v ||= x === 6 && y === 6 && z === 6;
@@ -600,12 +681,12 @@ export class Terrain {
 
                   if (selfEdge) {
                     this.ownerLines.push([
-                      { x, y, z },
-                      {
-                        x: selfEdge.position.x,
-                        y: selfEdge.position.y,
-                        z: selfEdge.position.z,
-                      }
+                      new Vector3(x, y, z),
+                      new Vector3(
+                        selfEdge.position.x,
+                        selfEdge.position.y,
+                        selfEdge.position.z,
+                      )
                     ]);
 
                     ["x", "y", "z"]
@@ -856,4 +937,180 @@ export class Terrain {
     //mat.wireframe = true;
     customMesh.material = mat;
   }
+}
+
+interface RayZ {
+  origin: Vector3;
+  direction: Vector3;
+}
+
+function rayBoxIntersection(ray: RayZ, grid: Terrain, t0: number,  t1: number): { result: false } | {result: true, tMin: number, tMax: number}  {
+    let tMin: number;
+    let tMax: number;
+
+    let tYMin: number;
+    let tYMax: number;
+    let tZMin: number; 
+    let tZMax: number;
+
+    const x_inv_dir = 1 / ray.direction.x;
+    if (x_inv_dir >= 0) {
+        tMin = (grid.minBound().x - ray.origin.x) * x_inv_dir;
+        tMax = (grid.maxBound().x - ray.origin.x) * x_inv_dir;
+    } else {
+        tMin = (grid.maxBound().x - ray.origin.x) * x_inv_dir;
+        tMax = (grid.minBound().x - ray.origin.x) * x_inv_dir;
+    }
+
+    const  y_inv_dir = 1 / ray.direction.y;
+    if (y_inv_dir >= 0) {
+        tYMin = (grid.minBound().y - ray.origin.y) * y_inv_dir;
+        tYMax = (grid.maxBound().y - ray.origin.y) * y_inv_dir;
+    } else {
+        tYMin = (grid.maxBound().y - ray.origin.y) * y_inv_dir;
+        tYMax = (grid.minBound().y - ray.origin.y) * y_inv_dir;
+    }
+
+    if (tMin > tYMax || tYMin > tMax) return { result: false}
+    if (tYMin > tMin) tMin = tYMin;
+    if (tYMax < tMax) tMax = tYMax;
+
+    const z_inv_dir = 1 / ray.direction.z;
+    if (z_inv_dir >= 0) {
+        tZMin = (grid.minBound().z - ray.origin.z) * z_inv_dir;
+        tZMax = (grid.maxBound().z - ray.origin.z) * z_inv_dir;
+    } else {
+        tZMin = (grid.maxBound().z - ray.origin.z) * z_inv_dir;
+        tZMax = (grid.minBound().z - ray.origin.z) * z_inv_dir;
+    }
+
+    if (tMin > tZMax || tZMin > tMax) return  { result: false}
+    if (tZMin > tMin) tMin = tZMin;
+    if (tZMax < tMax) tMax = tZMax;
+
+    if (tMin < t1 && tMax > t0) {
+      return { result: true, tMin, tMax};
+    }
+
+    // return false;
+
+    return { result: true, tMin, tMax};
+}
+
+function amanatidesWooAlgorithm(ray: RayZ, grid: Terrain, t0: number, t1: number): Vector3 | null {
+    let tMin: number;
+    let tMax: number;
+
+    // console.log("allo");
+    // console.log(grid.minBound());
+    // console.log(grid.maxBound());
+    // console.log(ray.origin);
+    // console.log(ray.direction);
+
+    const ray_intersects_grid = rayBoxIntersection(ray, grid, t0, t1);
+
+if (!ray_intersects_grid.result) console.log("no intersect");
+
+    if (!ray_intersects_grid.result) return;
+
+    console.log("intersect!!!");
+
+    tMin = ray_intersects_grid.tMin;
+    tMax = ray_intersects_grid.tMax;
+
+    tMin = Math.max(tMin, t0);
+    tMax = Math.max(tMax, t1);
+
+    const ray_start = ray.origin.add(ray.direction.scale(tMin));
+    const ray_end = ray.origin.add(ray.direction.scale(tMax));
+
+    let current_X_index = Math.max(1, Math.ceil(ray_start.x - grid.minBound().x / grid.voxelSize().x));
+    const end_X_index = Math.max(1, Math.ceil(ray_end.x - grid.minBound().x / grid.voxelSize().x));
+    let stepX: number; // int
+    let tDeltaX: number;
+    let tMaxX: number;
+    if (ray.direction.x > 0.0) {
+        stepX = 1;
+        tDeltaX = grid.voxelSize().x / ray.direction.x;
+        tMaxX = tMin + (grid.minBound().x + current_X_index * grid.voxelSize().x
+                        - ray_start.x) / ray.direction.x;
+    } else if (ray.direction.x < 0.0) {
+        stepX = -1;
+        tDeltaX = grid.voxelSize().x / -ray.direction.x;
+        const previous_X_index = current_X_index - 1;
+        tMaxX = tMin + (grid.minBound().x + previous_X_index * grid.voxelSize().x
+                        - ray_start.x) / ray.direction.x;
+    } else {
+        stepX = 0;
+        tDeltaX = tMax;
+        tMaxX = tMax;
+    }
+
+    let current_Y_index: number = Math.max(1, Math.ceil(ray_start.y - grid.minBound().y / grid.voxelSize().y));
+    const end_Y_index: number = Math.max(1, Math.ceil(ray_end.y - grid.minBound().y / grid.voxelSize().y));
+    let stepY: number; // int
+    let tDeltaY: number;
+    let tMaxY: number;
+    if (ray.direction.y > 0.0) {
+        stepY = 1;
+        tDeltaY = grid.voxelSize().y / ray.direction.y;
+        tMaxY = tMin + (grid.minBound().y + current_Y_index * grid.voxelSize().y
+                        - ray_start.y) / ray.direction.y;
+    } else if (ray.direction.y < 0.0) {
+        stepY= -1;
+        tDeltaY = grid.voxelSize().y / -ray.direction.y;
+        const previous_Y_index = current_Y_index - 1;
+        tMaxY = tMin + (grid.minBound().y + previous_Y_index * grid.voxelSize().y
+                        - ray_start.y) / ray.direction.y;
+    } else {
+        stepY = 0;
+        tDeltaY = tMax;
+        tMaxY = tMax;
+    }
+
+    let current_Z_index: number = Math.max(1, Math.ceil(ray_start.z - grid.minBound().z / grid.voxelSize().z));
+    const end_Z_index: number = Math.max(1, Math.ceil(ray_end.z - grid.minBound().z / grid.voxelSize().z));
+    let stepZ: number;
+    let tDeltaZ: number;
+    let tMaxZ: number;
+    if (ray.direction.z > 0.0) {
+        stepZ = 1;
+        tDeltaZ = grid.voxelSize().z / ray.direction.z;
+        tMaxZ = tMin + (grid.minBound().z + current_Z_index * grid.voxelSize().z
+                        - ray_start.z) / ray.direction.z;
+    } else if (ray.direction.z < 0.0) {
+        stepZ = -1;
+        tDeltaZ = grid.voxelSize().z / -ray.direction.z;
+        const previous_Z_index = current_Z_index - 1;
+        tMaxZ = tMin + (grid.minBound().z + previous_Z_index * grid.voxelSize().z
+                        - ray_start.z) / ray.direction.z;
+    } else {
+        stepZ = 0;
+        tDeltaZ = tMax;
+        tMaxZ = tMax;
+    }
+
+    //console.log("allo");
+
+    while (current_X_index != end_X_index || current_Y_index != end_Y_index || current_Z_index != end_Z_index) {
+        if (tMaxX < tMaxY && tMaxX < tMaxZ) {
+            // X-axis traversal.
+            current_X_index += stepX;
+            tMaxX += tDeltaX;
+        } else if (tMaxY < tMaxZ) {
+            // Y-axis traversal.
+            current_Y_index += stepY;
+            tMaxY += tDeltaY;
+        } else {
+            // Z-axis traversal.
+            current_Z_index += stepZ;
+            tMaxZ += tDeltaZ;
+        }
+        if (grid.getBlock(current_X_index, current_Y_index, current_Z_index).v === "solid") {
+          return new Vector3(current_X_index, current_Y_index, current_Z_index);
+        }
+        //console.log(current_X_index, current_Y_index, current_Z_index);
+    }
+
+    return null;
 }
