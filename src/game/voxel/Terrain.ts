@@ -118,6 +118,16 @@ export class Terrain {
     this.rendered = new TransformNode("root2", this.scene);
     this.rendered.parent = this.gridRoot;
 
+    // const t = MeshBuilder.CreateSphere(
+    //   "sphere",
+    //   { diameter: 3, segments: 10 },
+    //   this.scene
+    // );
+
+    // const tmaterial = new StandardMaterial("t");
+    // tmaterial.diffuseColor = Color3.Red();
+    // t.material = tmaterial;
+
     this.cubeMesh = MeshBuilder.CreateBox(
       "sphere",
       { size: 0.25 },
@@ -196,10 +206,6 @@ export class Terrain {
 
   getVoxel(x: number, y: number, z: number) {
     return this.voxels[x * (this.size * this.size) + y * (this.size) + z];
-  }
-
-  getVoxelPosFromFloat(x: number, y: number, z: number) {
-    return new Vector3(Math.floor(x), Math.floor(y), Math.floor(z));
   }
 
   getBlock(x: number, y: number, z: number) {

@@ -90,13 +90,13 @@ export class Generator {
     v ||= this.random() <= 0.005;
 
     //v ||= this.random() <= 0.01;
-    // v ||= (x === 3) && z === 3;
-    // v ||= (x === 3) && y === 3;
-    // v ||= (z === 3) && y === 3;
+    v ||= (x === 3) && z === 3;
+    v ||= (x === 3) && y === 3;
+    v ||= (z === 3) && y === 3;
 
-    // v ||= (x === this.size / 2) && z === this.size / 2;
-    // v ||= (x === this.size / 2) && y === this.size / 2;
-    // v ||= (z === this.size / 2) && y === this.size / 2;
+    v ||= (x === size / 2) && z === size / 2;
+    v ||= (x === size / 2) && y === size / 2;
+    v ||= (z === size / 2) && y === size / 2;
 
     //v ||= x==10;
     //v ||= x === 10 && y === 10 && z === 10;

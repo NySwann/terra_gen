@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv } from "vite";
 import { vitePlugins } from "./vite/plugins";
 import { resolve } from "path";
 
@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": pathResolve("src"),
+        "@tabler/icons-react": "@tabler/icons-react/dist/esm/icons/index.mjs",
       },
       // https://github.com/vitejs/vite/issues/178#issuecomment-630138450
       extensions: [".js", ".ts", ".jsx", ".tsx", ".json"],
@@ -52,20 +53,21 @@ export default defineConfig(({ mode }) => {
     build: {
       target: "modules",
       outDir: "dist",
-      chunkSizeWarningLimit: 550,
-      assetsInlineLimit: 4096,
-      rollupOptions: {
-        output: {
-          chunkFileNames: "static/js/[name]-[hash].js",
-          entryFileNames: "static/js/[name]-[hash].js",
-          assetFileNames: "static/[ext]/[name]-[hash].[ext]",
-        },
-      },
     },
 
     optimizeDeps: {
-      exclude: ["@babylonjs/havok"],
+      exclude: [
+        //"@babylonjs/core",
+        // "@babylonjs/gui",
+        // "@babylonjs/gui-editor",
+        "@babylonjs/inspector",
+        // "@babylonjs/materials",
+        "@babylonjs/havok",
+        "@babylonjs/addons",
+        "@babylonjs/loaders",
+        "@babylonjs/serializers",
+        //"@tabler/icons-react",
+      ],
     },
   };
 });
-

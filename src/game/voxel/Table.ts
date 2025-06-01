@@ -1,8 +1,10 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Color4, Mesh, MeshBuilder } from "@babylonjs/core";
 import fontData from "../droid.json";
-import earcut from 'earcut';
-import { precomputed_configIndexToEdgePositions, precomputed_configIndexToStr } from "./TableComputed";
+import {
+  precomputed_configIndexToEdgePositions,
+  precomputed_configIndexToStr,
+} from "./TableComputed";
 
 type Position = { x: number; y: number; z: number };
 
@@ -18,7 +20,7 @@ type Configuration = [
 ];
 type ConfigurationStr = string;
 
-export let configIndexToStr: ConfigurationStr[] = []
+export let configIndexToStr: ConfigurationStr[] = [];
 export let configIndexToEdgePositions: {
   [key: number]: (Position | null)[];
 } = {};
@@ -246,36 +248,40 @@ export class Table {
 
       let f = 0;
 
-      if (count1 == 5 && [0, 1, 2, 3, 4, 5, 6, 7].some(i => {
-        const cluster2 = [i];
-        this.deepSearchClusters(config[i], selectedConfig, i, cluster2);
+      if (
+        count1 == 5 &&
+        [0, 1, 2, 3, 4, 5, 6, 7].some((i) => {
+          const cluster2 = [i];
+          this.deepSearchClusters(config[i], selectedConfig, i, cluster2);
 
-        if (config[i] === "1" && cluster2.length === 1) {
-          f = i;
-          return true;
-        }
-        return false;
-      })) {
-        if (cluster.length === 1 && config[x] === '1') {
+          if (config[i] === "1" && cluster2.length === 1) {
+            f = i;
+            return true;
+          }
+          return false;
+        })
+      ) {
+        if (cluster.length === 1 && config[x] === "1") {
           edgePosition = {
             x: cornerIndexToGrab[cluster[0]].x * 1.5,
             y: cornerIndexToGrab[cluster[0]].y * 1.5,
             z: cornerIndexToGrab[cluster[0]].z * 1.5,
           };
-        }
-        else if (cluster.length === 1 && config[x] === '0') {
+        } else if (cluster.length === 1 && config[x] === "0") {
           const trickCluster = [x];
           const fakeConfigA = config.split("");
 
-          fakeConfigA[f] = '0';
+          fakeConfigA[f] = "0";
 
           const fakeConfig = fakeConfigA.join("");
           console.log(fakeConfig);
-          const fakeSelectedConfig = configIndexToStr.findIndex(c => c === fakeConfig)!;
+          const fakeSelectedConfig = configIndexToStr.findIndex(
+            (c) => c === fakeConfig
+          )!;
 
-          this.deepSearchClusters('0', fakeSelectedConfig, x, trickCluster);
+          this.deepSearchClusters("0", fakeSelectedConfig, x, trickCluster);
 
-          if (trickCluster.length !== 4 ) {
+          if (trickCluster.length !== 4) {
             throw new Error();
           }
 
@@ -292,13 +298,9 @@ export class Table {
               clusterGrabs.reduce((acc, v) => acc + v.z, 0) /
               clusterGrabs.length,
           };
-        }  else if (cluster.length === 4 && config[x] === '1') {
-
+        } else if (cluster.length === 4 && config[x] === "1") {
         }
-      }
-
-
-      else if (config[x] === of) {
+      } else if (config[x] === of) {
         if (balancedConfigurations.includes(config) || cluster.length === 4) {
           edgePosition = { x: 0, y: 0, z: 0 };
         } else if (cluster.length === 1) {
@@ -325,7 +327,7 @@ export class Table {
       }
 
       if (selectedConfig === this.debugConfig) {
-        console.log(edgePosition)
+        console.log(edgePosition);
       }
 
       if (edgePosition) {
@@ -372,23 +374,6 @@ export class Table {
 
       mesh.instancedBuffers.color =
         config[x] === "1" ? new Color4(1, 1, 1, 1) : new Color4(0, 0, 1, 1);
-
-      const text = MeshBuilder.CreateText(
-        "myText",
-        JSON.stringify(position),
-        fontData,
-        {
-          size: 0.06,
-          depth: 0.01,
-          resolution: 6,
-        },
-        this.scene,
-        earcut
-      )!;
-
-      text.position.x = position.x + p.x;
-      text.position.y = position.y + p.y + 0.5;
-      text.position.z = position.z + p.z;
 
       const ce = configIndexToEdgePositions[this.debugConfig];
 

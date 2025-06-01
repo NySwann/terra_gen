@@ -11,7 +11,7 @@ import { Table } from "../../voxel/Table";
 import { Renderer } from "../../Game";
 import { AbstractEngine } from "@babylonjs/core";
 import { Generator } from "@/game/voxel/Generator";
-import { EraserTool } from "@/game/voxel/EraserTool";
+import { EraserTool } from "@/game/voxel/tools/EraserTool";
 // import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 
 export default class MainScene extends Scene {
@@ -39,7 +39,14 @@ export default class MainScene extends Scene {
   }
 
   _setCamera(): void {
-    this.camera = new ArcRotateCamera("camera", Tools.ToRadians(90), Tools.ToRadians(80), 100, Vector3.Zero(), this);
+    this.camera = new ArcRotateCamera(
+      "camera",
+      Tools.ToRadians(90),
+      Tools.ToRadians(80),
+      100,
+      Vector3.Zero(),
+      this
+    );
     this.camera.attachControl(this.getEngine().getRenderingCanvas(), true);
     this.camera.setTarget(Vector3.Zero());
   }
@@ -54,7 +61,12 @@ export default class MainScene extends Scene {
   }
 
   _setPipeLine(): void {
-    const pipeline = new DefaultRenderingPipeline("default-pipeline", false, this, [this.activeCamera!]);
+    const pipeline = new DefaultRenderingPipeline(
+      "default-pipeline",
+      false,
+      this,
+      [this.activeCamera!]
+    );
     pipeline.fxaaEnabled = true;
     pipeline.samples = 4;
   }
