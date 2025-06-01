@@ -1,5 +1,4 @@
 import { Scene } from "@babylonjs/core/scene";
-import { mkSimplexNoise, SimplexNoise } from "../perlin";
 import {
   Camera,
   Color3,
@@ -15,12 +14,16 @@ import {
   VertexData,
 } from "@babylonjs/core";
 
+const axisNames = ["x", "y", "z"] as const;
+const axisDirection = [1, -1] as const;
+
 import {
   configIndexToEdgePositions,
   configIndexToStr,
   cornerIndexToEdgeIndex,
   cornerIndexToPosition,
 } from "./Table";
+import MainScene from "../scenes/MainScene/MainScene";
 
 interface Quad {
   points: [Point, Point, Point, Point];
@@ -82,27 +85,11 @@ function distance(a: Vector3, b: Vector3) {
   return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) + (a.z - b.z) * (a.z - b.z));
 }
 
-function sfc32(a, b, c, d) {
-  return function () {
-    a |= 0; b |= 0; c |= 0; d |= 0;
-    const t = (a + b | 0) + d | 0;
-    d = d + 1 | 0;
-    a = b ^ b >>> 9;
-    b = c + (c << 3) | 0;
-    c = (c << 21 | c >>> 11);
-    c = c + t | 0;
-    return (t >>> 0) / 4294967296;
-  }
-}
-
-
 let lines = true;
 let debug = false;
 
 export class Terrain {
-  camera: Camera;
-  noise: SimplexNoise;
-  scene: Scene;
+  scene: MainScene;
   size: number;
   blocks: Block[];
   voxels: Voxel[];
@@ -112,34 +99,24 @@ export class Terrain {
   meshLines: [Vector3, Vector3][];
   ownerLines: [Vector3, Vector3][];
   debugLines: [Vector3, Vector3][];
-  root: TransformNode;
+  gridRoot: TransformNode;
   rendered: TransformNode;
-  random: () => number;
-  selectorMesh: Mesh;
 
-  constructor(scene: Scene, camera: Camera) {
+  constructor(scene: MainScene) {
     this.scene = scene;
-    this.camera = camera;
 
     this.size = 50;
     this.blocks = new Array(this.size * this.size * this.size).fill(null).map(() => ({
       v: "gaz",
     }));
 
-    this.clearVoxels();
+    this.prepareVoxels();
 
-    //const seed = [Math.floor(Math.random() * 100), Math.floor(Math.random() * 100), Math.floor(Math.random() * 100), Math.floor(Math.random() * 100)];
-    const seed = [85, 44, 74, 6];
-    console.log("seed", seed);
-    this.random = sfc32(seed[0], seed[1], seed[2], seed[3]);
-
-    this.noise = mkSimplexNoise(this.random);
-
-    this.root = new TransformNode("root", this.scene);
-    this.root.position.set(-this.size / 2, -this.size / 2, -this.size / 2);
+    this.gridRoot = new TransformNode("root", this.scene);
+    this.gridRoot.position.set(-this.size / 2, -this.size / 2, -this.size / 2);
 
     this.rendered = new TransformNode("root2", this.scene);
-    this.rendered.parent = this.root;
+    this.rendered.parent = this.gridRoot;
 
     this.cubeMesh = MeshBuilder.CreateBox(
       "sphere",
@@ -156,142 +133,24 @@ export class Terrain {
 
     this.cubeMesh.position.set(100, 100, 100);
 
-    this.generate();
-    this.render();
-
-    let lastPick = new Date();
-
-    const selectorMesh = MeshBuilder.CreateBox(
-      "sphere",
-      { size: 0.5 },
-      this.scene
-    );
-    selectorMesh.isPickable = false;
-    const selectorMeshMaterial = new StandardMaterial("", this.scene);
-    selectorMeshMaterial.diffuseColor = Color3.Yellow();
-    selectorMesh.material = selectorMeshMaterial;
-    selectorMesh.parent = this.root;
-    selectorMesh.renderOutline = true;
-    selectorMesh.forceRenderingWhenOccluded = true;
-    selectorMesh.renderingGroupId = 1.0;
-
-    this.selectorMesh = selectorMesh;
-
-    const selectorMesh2 = MeshBuilder.CreateBox(
-      "sphere",
-      { size: 0.2 },
-      this.scene
-    );
-    selectorMesh2.isPickable = false;
-    const selectorMeshMaterial2 = new StandardMaterial("", this.scene);
-    selectorMeshMaterial2.diffuseColor = Color3.Red();
-    selectorMesh2.material = selectorMeshMaterial2;
-    selectorMesh2.parent = this.root;
-
-    let lastPos: Vector3 | null = null;
-
-    scene.onPointerMove = (e) => {
-      if (new Date().getTime() - lastPick.getTime() < 16) {
-        return;
-      }
-
-      lastPick = new Date();
-
-      const ray = scene.createPickingRay(scene.pointerX, scene.pointerY, Matrix.Identity(), camera);
-
-      // const hit = scene.pickWithRay(ray);
-
-      // if (hit?.pickedPoint) {
-      //   const position = new Vector3(Math.round(hit.pickedPoint?.x - this.root.position.x), Math.round(hit.pickedPoint?.y - this.root.position.y), Math.round(hit.pickedPoint?.z - this.root.position.z));
-
-      //   lastPos = position;
-
-      //   //console.log(position);
-
-      //   //selectorMesh.position.set(position.x, position.y, position.z);
-      // }
-
-      // const cameraViewport = camera.viewport;
-      // const viewport = cameraViewport.toGlobal(this.scene.getEngine().getRenderWidth(), this.scene.getEngine().getRenderHeight());
-
-      // // Moving coordinates to local viewport world
-      // const x = this.scene.pointerX / this.scene.getEngine().getHardwareScalingLevel() - viewport.x;
-      // const y = this.scene.pointerY / this.scene.getEngine().getHardwareScalingLevel() - (this.scene.getEngine().getRenderHeight() - viewport.y - viewport.height);
-
-      // const origin = Vector3.Unproject(
-      //                   new Vector3(x, y, 0),
-      //       	          this.scene.getEngine().getRenderWidth(),
-      //                   this.scene.getEngine().getRenderHeight(),
-      //                   Matrix.Identity(), scene.getViewMatrix(),
-      //                   scene.getProjectionMatrix());
-
-      // selectorMesh.position.set(origin.x, origin.y, origin.z);
-
-      const owner = selectorMesh.parent!;
-
-      owner.computeWorldMatrix();
-      const matrix = Matrix.Identity();
-      owner.getWorldMatrix().invertToRef(matrix);
-      const o = Vector3.TransformCoordinates(ray.origin, matrix);
-      //selectorMesh.position.set(o.x, o.y, o.z);
-
-      console.log(o);
-
-      const d = Vector3.TransformNormal(ray.direction, matrix);
-      const far = o.add(d.scale(10));
-      //selectorMesh2.position.set(far.x, far.y, far.z);
-
-      //const wm = this.root.getWorldMatrix();
-
-     // wm.invert();
-
-      // const o = Vector3.TransformCoordinates(origin, wm);
-
-      // //selectorMesh.position.set(o.x, o.y, o.z);
-
-      // const d = Vector3.TransformNormal(ray.direction, wm);
-
-      const rayz = {origin: o, direction: d};
-
-      const hitz = amanatidesWooAlgorithm(rayz, this, 0.0, 1.0);
-
-      if (hitz) {
-        lastPos = hitz;
-        this.selectorMesh.position.set(lastPos.x, lastPos.y, lastPos.z);
-      }
-    }
-
-    scene.onPointerDown = (e) => {
-      console.log(lastPos);
-
-      if (e.button === 0 && lastPos) {
-        console.log(lastPos);
-        console.log(this.getVoxel(lastPos.x, lastPos.y, lastPos.z));
-      }
-
-      if (e.button === 2 && lastPos) {
-        this.removeShit(lastPos.x, lastPos.y, lastPos.z);
-      }
-    }
-
     scene.onKeyboardObservable.add((kbInfo) => {
       switch (kbInfo.type) {
         case KeyboardEventTypes.KEYDOWN:
           switch (kbInfo.event.key) {
             case "d":
               debug = !debug;
-              this.clearVoxels();
+              this.prepareVoxels();
               this.rendered.dispose();
               this.rendered = new TransformNode("root2", this.scene);
-              this.rendered.parent = this.root;
+              this.rendered.parent = this.gridRoot;
               this.render();
               break;
             case "l":
               lines = !lines;
-              this.clearVoxels();
+              this.prepareVoxels();
               this.rendered.dispose();
               this.rendered = new TransformNode("root2", this.scene);
-              this.rendered.parent = this.root;
+              this.rendered.parent = this.gridRoot;
               this.render();
               break;
           }
@@ -311,7 +170,15 @@ export class Terrain {
     debug && this.drawDebugLines();
   }
 
-  clearVoxels() {
+  rerender() {
+    this.rendered.dispose();
+    this.rendered = new TransformNode("root2", this.scene);
+    this.rendered.parent = this.gridRoot;
+    this.prepareVoxels();
+    this.render();
+  }
+
+  prepareVoxels() {
     this.voxels = new Array(this.size * this.size * this.size).fill(null).map(() => ({
       edges: [null, null, null, null, null, null, null, null],
       edgesConfigs: [null, null, null, null, null, null, null, null],
@@ -345,11 +212,7 @@ export class Terrain {
     console.log("removeShit")
     this.setBlockMaterial(x, y, z, "gaz");
 
-    this.clearVoxels();
-    this.rendered.dispose();
-    this.rendered = new TransformNode("root2", this.scene);
-    this.rendered.parent = this.root;
-    this.render();
+    this.rerender();
   }
 
   minBound(): Vector3 {
@@ -464,118 +327,6 @@ export class Terrain {
       };
     }
   }
-
-  sample(x: number, y: number, z: number) {
-    let v = false;
-
-    //         v ||=
-    // noise.noise3D(x / 4, y / 4, z / 4) >=
-    // 0.8;
-
-    // v ||=
-    //   noise.noise3D(x / 8, y / 8, z / 8) +
-    //   noise.noise3D(x / 16, y / 16, z / 16) >=
-    //   0.5;
-
-    //           v ||=
-    //           noise.noise3D(x / 16, y / 16, z / 16) +
-    // noise.noise3D(x / 32, y / 32, z / 32) >=
-    // 0.5;
-
-    // v ||= x === this.size / 2 && y === this.size / 2 && z === this.size / 2;
-
-    //const sphereRadius = 10;
-    //const sphereVector3 = { x: (this.size - 2) - sphereRadius, y: (this.size - 2) - sphereRadius, z: (this.size - 2) - sphereRadius };
-    //const sphereVector3 = { x: 0, y: 0, z: 0 };
-
-    const sphereRadius = 20;
-    const sphereVector3 = { x: this.size / 2, y: this.size / 2, z: this.size / 2 };
-
-    // v ||=
-    //   Math.sqrt(
-    //     (x - sphereVector3.x) * (x - sphereVector3.x) +
-    //     (y - sphereVector3.y) * (y - sphereVector3.y) +
-    //     + (z - sphereVector3.z) * (z - sphereVector3.z)
-    //   ) < sphereRadius
-
-    v ||=
-      Math.sqrt(
-        (x - sphereVector3.x) * (x - sphereVector3.x) +
-        (y - sphereVector3.y) * (y - sphereVector3.y) +
-        + (z - sphereVector3.z) * (z - sphereVector3.z)
-      ) < sphereRadius && !(this.noise.noise3D(x / 32, y / 32, z / 32) + this.noise.noise3D(x / 16, y / 16, z / 16) >= 0.5);
-
-    if (
-      Math.sqrt(
-        (x - sphereVector3.x) * (x - sphereVector3.x) +
-        (y - sphereVector3.y) * (y - sphereVector3.y) +
-        + (z - sphereVector3.z) * (z - sphereVector3.z)
-      ) < sphereRadius - 5) {
-      v = false;
-    }
-
-    v ||= this.random() <= 0.005;
-
-    //v ||= this.random() <= 0.01;
-    // v ||= (x === 3) && z === 3;
-    // v ||= (x === 3) && y === 3;
-    // v ||= (z === 3) && y === 3;
-
-    // v ||= (x === this.size / 2) && z === this.size / 2;
-    // v ||= (x === this.size / 2) && y === this.size / 2;
-    // v ||= (z === this.size / 2) && y === this.size / 2;
-
-    //v ||= x==10;
-    //v ||= x === 10 && y === 10 && z === 10;
-
-    const cubeRadius = 10;
-    const cubeVector3 = { x: (this.size - 2) - cubeRadius, y: 2 + cubeRadius, z: (this.size - 2) - cubeRadius };
-
-    // v ||=
-    //   x > (cubeVector3.x - cubeRadius) &&
-    //   x < (cubeVector3.x + cubeRadius) &&
-    //   y > (cubeVector3.y - cubeRadius) &&
-    //   y < (cubeVector3.y + cubeRadius) &&
-    //   z > (cubeVector3.z - cubeRadius) &&
-    //   z < (cubeVector3.z + cubeRadius)
-
-    // v||= sdRoundBox(vec3(x, y, z), vec3(this.size/2, this.size/2, this.size/2), 10) < 0;
-
-    v &&= x > 2 && x < this.size - 2 && y > 2 && y < this.size - 2 && z > 2 && z < this.size - 2
-
-    return v;
-  }
-
-  sampled(x: number, y: number, z: number) {
-    let v = false;
-
-    const sphereRadius = 10;
-    const sphereVector3 = { x: 0, y: 0, z: 0 };
-
-    v ||=
-      Math.sqrt(
-        (x - sphereVector3.x) * (x - sphereVector3.x) +
-        (y - sphereVector3.y) * (y - sphereVector3.y) +
-        + (z - sphereVector3.z) * (z - sphereVector3.z)
-      ) < sphereRadius;
-
-    v ||= x === 6 && y === 6 && z === 6;
-
-    return v;
-  }
-
-
-  generate() {
-    for (let x = 0; x < this.size; x++) {
-      for (let y = 0; y < this.size; y++) {
-        for (let z = 0; z < this.size; z++) {
-          const sample = this.sample(x, y, z);
-          //if (x > 10 && x < 16 && z > 32 && z < 40 && y > 34)
-          this.setBlockMaterial(x, y, z, sample ? "solid" : "gaz");
-        }
-      }
-    }
-  }
   
   computeEdges(x: number, y: number, z: number) {
           const config = [
@@ -657,8 +408,8 @@ export class Terrain {
 
             const allSelf = cornerData.edges.every(e => e !== null);
 
-            [1, -1].forEach((sign) => {
-              ["x", "y", "z"].forEach((axis) => {
+            axisDirection.forEach((sign) => {
+              axisNames.forEach((axis) => {
                 const selfAxisCornerIndexes = cornerIndexToPosition
                   .map((c, i) => (c[axis] === (sign === -1 ? 1 : 0) ? i : -1)) // -1 c'est 1 car  [0    1]X[0    1]  
                   .filter((i) => i >= 0);
@@ -689,10 +440,10 @@ export class Terrain {
                       )
                     ]);
 
-                    ["x", "y", "z"]
+                   axisNames
                       .filter((a) => axis !== a)
                       .map((otherAxis) => {
-                        const lastAxis = ["x", "y", "z"].find(
+                        const lastAxis = axisNames.find(
                           (a) => a !== axis && a !== otherAxis
                         );
 
@@ -937,180 +688,4 @@ export class Terrain {
     //mat.wireframe = true;
     customMesh.material = mat;
   }
-}
-
-interface RayZ {
-  origin: Vector3;
-  direction: Vector3;
-}
-
-function rayBoxIntersection(ray: RayZ, grid: Terrain, t0: number,  t1: number): { result: false } | {result: true, tMin: number, tMax: number}  {
-    let tMin: number;
-    let tMax: number;
-
-    let tYMin: number;
-    let tYMax: number;
-    let tZMin: number; 
-    let tZMax: number;
-
-    const x_inv_dir = 1 / ray.direction.x;
-    if (x_inv_dir >= 0) {
-        tMin = (grid.minBound().x - ray.origin.x) * x_inv_dir;
-        tMax = (grid.maxBound().x - ray.origin.x) * x_inv_dir;
-    } else {
-        tMin = (grid.maxBound().x - ray.origin.x) * x_inv_dir;
-        tMax = (grid.minBound().x - ray.origin.x) * x_inv_dir;
-    }
-
-    const  y_inv_dir = 1 / ray.direction.y;
-    if (y_inv_dir >= 0) {
-        tYMin = (grid.minBound().y - ray.origin.y) * y_inv_dir;
-        tYMax = (grid.maxBound().y - ray.origin.y) * y_inv_dir;
-    } else {
-        tYMin = (grid.maxBound().y - ray.origin.y) * y_inv_dir;
-        tYMax = (grid.minBound().y - ray.origin.y) * y_inv_dir;
-    }
-
-    if (tMin > tYMax || tYMin > tMax) return { result: false}
-    if (tYMin > tMin) tMin = tYMin;
-    if (tYMax < tMax) tMax = tYMax;
-
-    const z_inv_dir = 1 / ray.direction.z;
-    if (z_inv_dir >= 0) {
-        tZMin = (grid.minBound().z - ray.origin.z) * z_inv_dir;
-        tZMax = (grid.maxBound().z - ray.origin.z) * z_inv_dir;
-    } else {
-        tZMin = (grid.maxBound().z - ray.origin.z) * z_inv_dir;
-        tZMax = (grid.minBound().z - ray.origin.z) * z_inv_dir;
-    }
-
-    if (tMin > tZMax || tZMin > tMax) return  { result: false}
-    if (tZMin > tMin) tMin = tZMin;
-    if (tZMax < tMax) tMax = tZMax;
-
-    if (tMin < t1 && tMax > t0) {
-      return { result: true, tMin, tMax};
-    }
-
-    // return false;
-
-    return { result: true, tMin, tMax};
-}
-
-function amanatidesWooAlgorithm(ray: RayZ, grid: Terrain, t0: number, t1: number): Vector3 | null {
-    let tMin: number;
-    let tMax: number;
-
-    // console.log("allo");
-    // console.log(grid.minBound());
-    // console.log(grid.maxBound());
-    // console.log(ray.origin);
-    // console.log(ray.direction);
-
-    const ray_intersects_grid = rayBoxIntersection(ray, grid, t0, t1);
-
-if (!ray_intersects_grid.result) console.log("no intersect");
-
-    if (!ray_intersects_grid.result) return;
-
-    console.log("intersect!!!");
-
-    tMin = ray_intersects_grid.tMin;
-    tMax = ray_intersects_grid.tMax;
-
-    tMin = Math.max(tMin, t0);
-    tMax = Math.max(tMax, t1);
-
-    const ray_start = ray.origin.add(ray.direction.scale(tMin));
-    const ray_end = ray.origin.add(ray.direction.scale(tMax));
-
-    let current_X_index = Math.max(1, Math.ceil(ray_start.x - grid.minBound().x / grid.voxelSize().x));
-    const end_X_index = Math.max(1, Math.ceil(ray_end.x - grid.minBound().x / grid.voxelSize().x));
-    let stepX: number; // int
-    let tDeltaX: number;
-    let tMaxX: number;
-    if (ray.direction.x > 0.0) {
-        stepX = 1;
-        tDeltaX = grid.voxelSize().x / ray.direction.x;
-        tMaxX = tMin + (grid.minBound().x + current_X_index * grid.voxelSize().x
-                        - ray_start.x) / ray.direction.x;
-    } else if (ray.direction.x < 0.0) {
-        stepX = -1;
-        tDeltaX = grid.voxelSize().x / -ray.direction.x;
-        const previous_X_index = current_X_index - 1;
-        tMaxX = tMin + (grid.minBound().x + previous_X_index * grid.voxelSize().x
-                        - ray_start.x) / ray.direction.x;
-    } else {
-        stepX = 0;
-        tDeltaX = tMax;
-        tMaxX = tMax;
-    }
-
-    let current_Y_index: number = Math.max(1, Math.ceil(ray_start.y - grid.minBound().y / grid.voxelSize().y));
-    const end_Y_index: number = Math.max(1, Math.ceil(ray_end.y - grid.minBound().y / grid.voxelSize().y));
-    let stepY: number; // int
-    let tDeltaY: number;
-    let tMaxY: number;
-    if (ray.direction.y > 0.0) {
-        stepY = 1;
-        tDeltaY = grid.voxelSize().y / ray.direction.y;
-        tMaxY = tMin + (grid.minBound().y + current_Y_index * grid.voxelSize().y
-                        - ray_start.y) / ray.direction.y;
-    } else if (ray.direction.y < 0.0) {
-        stepY= -1;
-        tDeltaY = grid.voxelSize().y / -ray.direction.y;
-        const previous_Y_index = current_Y_index - 1;
-        tMaxY = tMin + (grid.minBound().y + previous_Y_index * grid.voxelSize().y
-                        - ray_start.y) / ray.direction.y;
-    } else {
-        stepY = 0;
-        tDeltaY = tMax;
-        tMaxY = tMax;
-    }
-
-    let current_Z_index: number = Math.max(1, Math.ceil(ray_start.z - grid.minBound().z / grid.voxelSize().z));
-    const end_Z_index: number = Math.max(1, Math.ceil(ray_end.z - grid.minBound().z / grid.voxelSize().z));
-    let stepZ: number;
-    let tDeltaZ: number;
-    let tMaxZ: number;
-    if (ray.direction.z > 0.0) {
-        stepZ = 1;
-        tDeltaZ = grid.voxelSize().z / ray.direction.z;
-        tMaxZ = tMin + (grid.minBound().z + current_Z_index * grid.voxelSize().z
-                        - ray_start.z) / ray.direction.z;
-    } else if (ray.direction.z < 0.0) {
-        stepZ = -1;
-        tDeltaZ = grid.voxelSize().z / -ray.direction.z;
-        const previous_Z_index = current_Z_index - 1;
-        tMaxZ = tMin + (grid.minBound().z + previous_Z_index * grid.voxelSize().z
-                        - ray_start.z) / ray.direction.z;
-    } else {
-        stepZ = 0;
-        tDeltaZ = tMax;
-        tMaxZ = tMax;
-    }
-
-    //console.log("allo");
-
-    while (current_X_index != end_X_index || current_Y_index != end_Y_index || current_Z_index != end_Z_index) {
-        if (tMaxX < tMaxY && tMaxX < tMaxZ) {
-            // X-axis traversal.
-            current_X_index += stepX;
-            tMaxX += tDeltaX;
-        } else if (tMaxY < tMaxZ) {
-            // Y-axis traversal.
-            current_Y_index += stepY;
-            tMaxY += tDeltaY;
-        } else {
-            // Z-axis traversal.
-            current_Z_index += stepZ;
-            tMaxZ += tDeltaZ;
-        }
-        if (grid.getBlock(current_X_index, current_Y_index, current_Z_index).v === "solid") {
-          return new Vector3(current_X_index, current_Y_index, current_Z_index);
-        }
-        //console.log(current_X_index, current_Y_index, current_Z_index);
-    }
-
-    return null;
 }

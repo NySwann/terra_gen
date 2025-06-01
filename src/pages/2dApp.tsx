@@ -1,6 +1,6 @@
 import { useEffect, useRef} from 'react'
 import './App.css'
-import { mkSimplexNoise } from './perlin';
+import { mkSimplexNoise } from '../game/voxel/perlin';
 
 type EdgePos = {x: number, y: number};
 type Block = { v: number, bottomRightEdge: EdgePos | null, bottomLeftEdge: EdgePos | null, topRightEdge: EdgePos | null, topLeftEdge: EdgePos | null}

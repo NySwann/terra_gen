@@ -1,18 +1,17 @@
 //import "@babylonjs/core/Debug/debugLayer";
 //import "@babylonjs/inspector";
 import { Engine } from "@babylonjs/core/Engines/engine";
-import { Scene } from "@babylonjs/core/scene";
 import { AxesViewer } from "@babylonjs/core/Debug/axesViewer";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 import HavokPhysics from "@babylonjs/havok";
 
-import MainScene from "./MainScene";
+import MainScene from "./scenes/MainScene/MainScene";
 
-export class Renderer {
+export class Game {
   public engine: Engine | WebGPUEngine;
-  public scene: Scene;
+  public scene: MainScene;
 
   private canvas: HTMLCanvasElement;
 
@@ -33,12 +32,10 @@ export class Renderer {
       disableWebGL2Support: false,
     });
 
-    this.scene = new Scene(this.engine);
+    this.scene = new MainScene(this.engine);
 
     // Add physics. If not needed, you can annotate it to improve loading speed and environment performance.
     await this._setPhysics();
-
-    new MainScene(this.scene, this.canvas, this.engine);
 
     this._config();
     this._renderer();
@@ -51,13 +48,11 @@ export class Renderer {
     }));
     await webgpu.initAsync();
     this.engine = webgpu;
-    console.log(this.engine);
 
-    this.scene = new Scene(this.engine);
+    this.scene = new MainScene(this.engine);
+
     // Add physics. If not needed, you can annotate it to improve loading speed and environment performance.
     await this._setPhysics();
-
-    new MainScene(this.scene, this.canvas, this.engine);
 
     this._config();
     this._renderer();
@@ -77,13 +72,9 @@ export class Renderer {
 
   _fps(): void {
     const dom = document.getElementById("display-fps");
+    
     if (dom) {
       dom.innerHTML = `${this.engine.getFps().toFixed()} fps`;
-    } else {
-      const div = document.createElement("div");
-      div.id = "display-fps";
-      div.innerHTML = "0";
-      document.body.appendChild(div);
     }
   }
 

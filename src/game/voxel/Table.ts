@@ -1,11 +1,8 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Color4, Mesh, MeshBuilder } from "@babylonjs/core";
-import {
-  precomputed_configIndexToEdgePositions,
-  precomputed_configIndexToStr,
-} from "./TableComputed";
-import fontData from "./droid.json";
+import fontData from "../droid.json";
 import earcut from 'earcut';
+import { precomputed_configIndexToEdgePositions, precomputed_configIndexToStr } from "./TableComputed";
 
 type Position = { x: number; y: number; z: number };
 

@@ -1,10 +1,12 @@
 import react from '@vitejs/plugin-react-swc'
 import glsl from 'vite-plugin-glsl'
+import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import { createHtmlPlugin } from 'vite-plugin-html'
 
-const vitePlugins = (env: Record<string, string>) => {
+export const vitePlugins = (env: Record<string, string>) => {
   return [
     react(),
+    vanillaExtractPlugin(),
     glsl(), // Convenient for you to write shader
     createHtmlPlugin({
       inject: {
@@ -15,5 +17,3 @@ const vitePlugins = (env: Record<string, string>) => {
     })
   ]
 }
-
-export { vitePlugins }
