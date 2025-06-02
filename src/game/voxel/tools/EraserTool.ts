@@ -8,23 +8,28 @@ import {
   Mesh,
 } from "@babylonjs/core";
 import { Terrain } from "../Terrain";
-import { Tool } from "./tool";
 import MainScene from "../../scenes/MainScene/MainScene";
-import { amanatidesWooAlgorithm2 } from "./ray2";
 import { amanatidesWooAlgorithm } from "../ray";
+import type { Tool } from "./tool";
 
 export class EraserTool implements Tool {
   rendered: TransformNode;
   selectorMesh: Mesh;
 
   bind(terrain: Terrain, scene: MainScene) {
+    console.log("bind tool");
+
     this.rendered = new TransformNode("root2", scene);
 
     let lastPick = new Date();
     // in voxel grid space
     let lastPos: Vector3 | null = null;
 
-    const selectorMesh = MeshBuilder.CreateBox("sphere", { size: 1.4 }, scene);
+    const diameter = 4;
+
+    console.log(diameter)
+
+    const selectorMesh = MeshBuilder.CreateSphere("sphere", { diameter}, scene);
     selectorMesh.isPickable = false;
     const selectorMeshMaterial = new StandardMaterial("", scene);
     selectorMeshMaterial.alpha = 0.4;
@@ -86,7 +91,7 @@ export class EraserTool implements Tool {
       const o = Vector3.TransformCoordinates(ray.origin, matrix);
       //selectorMesh.position.set(o.x, o.y, o.z);
 
-      console.log(o);
+      //console.log(o);
 
       const d = Vector3.TransformNormal(ray.direction, matrix);
       const far = o.add(d.scale(10));
@@ -111,7 +116,13 @@ export class EraserTool implements Tool {
       const getVoxel = (x: number, y: number, z: number) => {
         //console.log(x, y, z);
 
-        return terrain.getBlock(x, y, z).v === "solid";
+        const block = terrain.getBlock(x, y, z);
+
+        if (!block) {
+          console.log(x, y, z);
+        }
+
+        return block.v === "solid";
       };
 
       // ici l'algo pense que les voxels demarrent en [1] alors qu'ils sont VISUELLEMENT en [-0.5] mais leurs indices sont [0]
@@ -126,7 +137,7 @@ export class EraserTool implements Tool {
       if (hitz) {
         lastPos = hitz;
 
-        console.log(lastPos);
+        //console.log(lastPos);
 
         // back to world space
 
@@ -140,7 +151,7 @@ export class EraserTool implements Tool {
     };
 
     scene.onPointerDown = (e) => {
-      console.log(lastPos);
+      //console.log(lastPos);
 
       if (e.button === 0 && lastPos) {
         console.log(lastPos);

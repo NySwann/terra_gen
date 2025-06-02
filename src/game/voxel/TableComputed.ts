@@ -255,9 +255,7 @@ export const precomputed_configIndexToStr = [
   "01111111",
 ];
 
-export const precomputed_configIndexToEdgePositions: {
-  [key: number]: ({ x: number; y: number; z: number } | null)[];
-} = {
+export const precomputed_configIndexToEdgePositions: Record<number, ({ x: number; y: number; z: number } | null)[]> = {
   "0": [
     {
       "x": -0.375,

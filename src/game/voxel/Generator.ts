@@ -1,4 +1,4 @@
-import { mkSimplexNoise, SimplexNoise } from "./perlin";
+import { mkSimplexNoise, type SimplexNoise } from "./perlin";
 import { Terrain } from "./Terrain";
 
 function sfc32(a: number, b: number, c: number, d: number) {

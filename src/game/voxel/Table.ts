@@ -6,7 +6,7 @@ import {
   precomputed_configIndexToStr,
 } from "./TableComputed";
 
-type Position = { x: number; y: number; z: number };
+interface Position { x: number; y: number; z: number }
 
 type Configuration = [
   number,
@@ -21,9 +21,7 @@ type Configuration = [
 type ConfigurationStr = string;
 
 export let configIndexToStr: ConfigurationStr[] = [];
-export let configIndexToEdgePositions: {
-  [key: number]: (Position | null)[];
-} = {};
+export let configIndexToEdgePositions: Record<number, (Position | null)[]> = {};
 
 export const cornerIndexToPosition = [
   { x: 0, y: 0, z: 0 }, //
@@ -230,7 +228,7 @@ export class Table {
 
     const count1 = config.split("").filter((c) => c === "1").length;
     const count0 = config.split("").filter((c) => c === "0").length;
-    let of = count1 <= count0 ? "1" : "0";
+    const of = count1 <= count0 ? "1" : "0";
 
     if (selectedConfig === this.debugConfig) {
       console.log(config);
@@ -277,7 +275,7 @@ export class Table {
           console.log(fakeConfig);
           const fakeSelectedConfig = configIndexToStr.findIndex(
             (c) => c === fakeConfig
-          )!;
+          );
 
           this.deepSearchClusters("0", fakeSelectedConfig, x, trickCluster);
 

@@ -1,13 +1,15 @@
-import react from '@vitejs/plugin-react-swc'
-import glsl from 'vite-plugin-glsl'
+import react from '@vitejs/plugin-react'
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import { createHtmlPlugin } from 'vite-plugin-html'
 
 export const vitePlugins = (env: Record<string, string>) => {
   return [
-    react(),
+
+    // tried @vitejs/plugin-react-swc, hmr broken
+    react({
+       include: "**/*.tsx",
+    }),
     vanillaExtractPlugin(),
-    glsl(), // Convenient for you to write shader
     createHtmlPlugin({
       inject: {
         data: {

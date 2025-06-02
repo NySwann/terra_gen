@@ -1,20 +1,11 @@
 import { useState } from 'react';
 import {
-  Icon2fa,
-  IconBellRinging,
-  IconDatabaseImport,
-  IconFingerprint,
-  IconKey,
-  IconLogout,
   IconPencil,
-  IconReceipt2,
-  IconSettings,
-  IconSwitchHorizontal,
 } from '@tabler/icons-react';
 import { AppShell, Code, Group, Text } from '@mantine/core';
 import classes from './Navbar.module.css';
-import { useStoreValue } from '@/hooks/useStore';
-import { panelStore } from '@/stores/panel';
+import { useStoreValue } from '../../../hooks/useStore';
+import { panelStore } from '../../../stores/panel';
 
 const data = [
   { link: 'edit', label: 'Edit', icon: IconPencil} as const,

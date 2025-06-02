@@ -2,8 +2,8 @@ import { useEffect, useRef} from 'react'
 import './App.css'
 import { mkSimplexNoise } from '../game/voxel/perlin';
 
-type EdgePos = {x: number, y: number};
-type Block = { v: number, bottomRightEdge: EdgePos | null, bottomLeftEdge: EdgePos | null, topRightEdge: EdgePos | null, topLeftEdge: EdgePos | null}
+interface EdgePos {x: number, y: number}
+interface Block { v: number, bottomRightEdge: EdgePos | null, bottomLeftEdge: EdgePos | null, topRightEdge: EdgePos | null, topLeftEdge: EdgePos | null}
 
 const dotSize = 2;
 
@@ -29,7 +29,7 @@ class Map {
       for (let y = 0; y < this.height; y++)
       {
 
-        let insideCircle = Math.sqrt((x - 15.0) * (x - 15.0) + (y - 15.0) * (y - 15.0)) < 10;
+        const insideCircle = Math.sqrt((x - 15.0) * (x - 15.0) + (y - 15.0) * (y - 15.0)) < 10;
 
         const v = noise.noise2D(x / 8, y / 8) + noise.noise2D(x / 16, y / 16) + noise.noise2D(x / 32, y / 32) + noise.noise2D(x / 64, y / 64) >= 0.5 ? 1.0 : 0.0;
          

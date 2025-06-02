@@ -214,8 +214,7 @@ export class Terrain {
 
   removeShit(x: number, y: number, z: number) {
 
-    console.log(this.getBlock(x, y, z));
-    console.log("removeShit")
+    //console.log(this.getBlock(x, y, z));
     this.setBlockMaterial(x, y, z, "gaz");
 
     this.rerender();
@@ -237,7 +236,7 @@ export class Terrain {
     const voxel = this.getVoxel(Math.floor(x), Math.floor(y), Math.floor(z));
 
     if (!voxel) {
-      console.log(x, y, z);
+      //console.log(x, y, z);
     }
 
     for (const point of voxel.points) {
@@ -349,7 +348,7 @@ export class Terrain {
             .join("");
 
           if (x === 13 && y === 38 && z === 36) {
-            console.log(config);
+            //console.log(config);
           }
 
           const configIndex = configIndexToStr.findIndex((v) => v === config);
@@ -369,7 +368,7 @@ export class Terrain {
 
 
               if (x + cornerPos.x == 13 &&  y + cornerPos.y == 38 && z + cornerPos.z == 36) {
-                console.log(edge);
+                //console.log(edge);
               }
 
               if (edge) {
@@ -379,8 +378,8 @@ export class Terrain {
 
                 const point = this.getPoint(px, py, pz);
 
-                              if (x + cornerPos.x == 13 &&  y + cornerPos.y == 38 && z + cornerPos.z == 36) {
-                console.log(point.position);
+              if (x + cornerPos.x == 13 &&  y + cornerPos.y == 38 && z + cornerPos.z == 36) {
+                //console.log(point.position);
               }
 
                 corner.edges[cornerIndexToEdgeIndex[i]] = point;
@@ -486,15 +485,15 @@ export class Terrain {
                         if (!allSelf && !allFar)
                         {
                           if (x == 13 && y == 38 && z == 36) {
-                            console.log(cornerData);
-                            console.log(farOpposedCornerData);
+                            // console.log(cornerData);
+                            // console.log(farOpposedCornerData);
                           }
                           if (x == 13 && y == 37 && z == 36 && axis == "y" && sign == 1) {
-                            console.log(cornerData);
-                            console.log(cornerData.edges.every(e => e !== null))
-                            console.log(farOpposedCornerData);
-                            console.log(farOpposedCornerData.edges.every(e => e !== null));
-                            console.log(farOpposedCornerData.edges);
+                            // console.log(cornerData);
+                            // console.log(cornerData.edges.every(e => e !== null))
+                            // console.log(farOpposedCornerData);
+                            // console.log(farOpposedCornerData.edges.every(e => e !== null));
+                            // console.log(farOpposedCornerData.edges);
                           }
                           const farOpposedCornerIndex =
                             revertedSelfAxisCornerIndexes.find(

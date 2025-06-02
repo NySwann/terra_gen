@@ -1,39 +1,7 @@
 {
-    "compilerOptions": {
-        "target": "ESNext", // choose our ECMA/JavaScript version (all modern browsers support ES6 so it's your best bet)
-        "lib": [ // choose our default ECMA/libraries to import
-            "DOM", // mandatory for all browser-based apps
-            "DOM.Iterable",
-            "ESNext" // mandatory for targeting ES6
-        ],
-        "module": "ESNext",
-        "skipLibCheck": true, // skip type-checking of .d.ts files (it speeds up transpiling)
-
-        /* Bundler mode */
-        "moduleResolution": "bundler",
-        "allowImportingTsExtensions": true,
-        "resolveJsonModule": true,
-        "isolatedModules": true, // allows our code to be processed by other transpilers, such as preventing non-module TS files (you could delete this since we're only using base TypeScript)
-        "noEmit": true,
-        "jsx": "react-jsx",
-
-        /* Linting */
-        "strict": true,
-        "noFallthroughCasesInSwitch": true,
-
-        "baseUrl": "./",
-        "noResolve": false, // disable TypeScript from automatically detecting/adding files based on import statements and etc (it's less helpful than you think)
-        "removeComments": true, // remove comments from our outputted code to save on space (look into terser if you want to protect the outputted JS even more)
-        "esModuleInterop": true, // treats non-ES6 modules separately from ES6 modules (helpful if module: "ESNext")
-        "noImplicitAny": true, // usually prevents code from using "any" type fallbacks to prevent untraceable JS errors, but we'll need this disabled for our example code
-        "noUnusedLocals": false, // usually raises an error for any unused local variables, but we'll need this disabled for our example code
-        "noUnusedParameters": false, // raises an error for unused parameters
-        "noImplicitReturns": true, // raises an error for functions that return nothing
-        "strictPropertyInitialization": false,
-        "paths": {
-            "@/*": ["src/*"]
-        },
-    },
-    "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "tests/**/*.ts", "tests/**/*.tsx", "src/**/*.d.ts", "**/*.ts", "**/*.glsl", "**/*.vue"],
-    "exclude": ["node_modules", "tests/server/**/*.ts", "dist", "**/*.js"]
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
 }

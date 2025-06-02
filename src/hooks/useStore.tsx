@@ -1,5 +1,6 @@
-import { createStore, Store } from "@/stores/store";
+
 import { useRef, useState, useEffect } from "react";
+import { createStore, type Store } from "../stores/store";
 
 export const useStore = <T,>(initialValue: T): Store<T> =>
 {

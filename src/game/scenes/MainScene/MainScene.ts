@@ -1,18 +1,11 @@
-import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
-import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
-import { Engine } from "@babylonjs/core/Engines/engine";
-import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
-import { Scene } from "@babylonjs/core/scene";
-import { Tools } from "@babylonjs/core/Misc/tools";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
-import { Terrain } from "../../voxel/Terrain";
-import { Table } from "../../voxel/Table";
-import { Renderer } from "../../Game";
-import { AbstractEngine } from "@babylonjs/core";
-import { Generator } from "@/game/voxel/Generator";
-import { EraserTool } from "@/game/voxel/tools/EraserTool";
+
 // import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
+
+import { Scene, ArcRotateCamera, AbstractEngine, Tools, Vector3, HemisphericLight, DefaultRenderingPipeline } from "@babylonjs/core";
+import { Generator } from "../../voxel/Generator";
+import { Terrain } from "../../voxel/Terrain";
+import { EraserTool } from "../../voxel/tools/EraserTool";
+import { Table } from "../../voxel/Table";
 
 export default class MainScene extends Scene {
   camera: ArcRotateCamera;

@@ -1,4 +1,4 @@
-type StoreListener = { onChange: () => void };
+interface StoreListener { onChange: () => void }
 
 interface StoreInternal<T> {
     getValue: () => T,
@@ -17,7 +17,7 @@ const createStoreInternal = <T,>(initialValue: T): StoreInternal<T> => {
         setValue: (newValue) => {
             value = newValue;
 
-            listeners.forEach(l => l.onChange());
+            listeners.forEach(l => { l.onChange(); });
         },
         addListener: (listener) => {
             listeners.push(listener);
