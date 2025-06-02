@@ -19,6 +19,8 @@ export const useStoreValue = <T,>(store: Store<T>): T => {
             }
         });
 
+        setValue(store.getValue());
+
         return () => {
             store._internal.remListener(listener);
         }

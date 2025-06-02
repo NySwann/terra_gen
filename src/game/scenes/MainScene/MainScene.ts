@@ -4,11 +4,13 @@
 import { Scene, ArcRotateCamera, AbstractEngine, Tools, Vector3, HemisphericLight, DefaultRenderingPipeline } from "@babylonjs/core";
 import { Generator } from "../../voxel/Generator";
 import { Terrain } from "../../voxel/Terrain";
-import { EraserTool } from "../../voxel/tools/EraserTool";
 import { Table } from "../../voxel/Table";
+import { EraserTool } from "../../voxel/tools/EraserTool";
+import type { Tool } from "../../voxel/tools/tool";
 
 export default class MainScene extends Scene {
   camera: ArcRotateCamera;
+  tool: Tool;
 
   constructor(engine: AbstractEngine) {
     super(engine);
@@ -29,6 +31,8 @@ export default class MainScene extends Scene {
     const tool = new EraserTool();
 
     tool.bind(terrain, this);
+
+    this.tool = tool;
   }
 
   _setCamera(): void {

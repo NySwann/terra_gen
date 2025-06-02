@@ -88,27 +88,27 @@ export class Table {
     this.sphereMesh.registerInstancedBuffer("color", 4);
     this.sphereMesh.instancedBuffers.color = new Color4(0.2, 0.6, 0.4, 1.0);
 
-    configIndexToStr = precomputed_configIndexToStr;
-    configIndexToEdgePositions = precomputed_configIndexToEdgePositions;
+    // configIndexToStr = precomputed_configIndexToStr;
+    // configIndexToEdgePositions = precomputed_configIndexToEdgePositions;
 
-    // configIndexToStr = [];
-    // configIndexToEdgePositions = {}
+    configIndexToStr = [];
+    configIndexToEdgePositions = {}
 
-    // this.generateConfig(1, 1, [0, 0, 0, 0, 0, 0, 0, 0]);
-    // this.generateConfig(1, 2, [0, 0, 0, 0, 0, 0, 0, 0]);
-    // this.generateConfig(1, 3, [0, 0, 0, 0, 0, 0, 0, 0]);
-    // this.generateConfig(1, 4, [0, 0, 0, 0, 0, 0, 0, 0]);
-    // this.generateConfig(1, 5, [0, 0, 0, 0, 0, 0, 0, 0]);
-    // this.generateConfig(1, 6, [0, 0, 0, 0, 0, 0, 0, 0]);
-    // this.generateConfig(1, 7, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 1, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 2, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 3, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 4, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 5, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 6, [0, 0, 0, 0, 0, 0, 0, 0]);
+    this.generateConfig(1, 7, [0, 0, 0, 0, 0, 0, 0, 0]);
 
     this.debugConfig = configIndexToStr.findIndex((d) => d == "11010110");
 
-    // for (const c of configIndexToStr) {
-    //   //console.log(c);
+    for (const c of configIndexToStr) {
+      //console.log(c);
 
-    //   this.generateEdges(configIndexToStr.indexOf(c));
-    // }
+      this.generateEdges(configIndexToStr.indexOf(c));
+    }
 
     //console.log(JSON.stringify(configIndexToStr, null, 2));
     //console.log(JSON.stringify(configIndexToEdgePositions, null, 2));
@@ -266,37 +266,9 @@ export class Table {
             z: cornerIndexToGrab[cluster[0]].z * 1.5,
           };
         } else if (cluster.length === 1 && config[x] === "0") {
-          const trickCluster = [x];
-          const fakeConfigA = config.split("");
-
-          fakeConfigA[f] = "0";
-
-          const fakeConfig = fakeConfigA.join("");
-          console.log(fakeConfig);
-          const fakeSelectedConfig = configIndexToStr.findIndex(
-            (c) => c === fakeConfig
-          );
-
-          this.deepSearchClusters("0", fakeSelectedConfig, x, trickCluster);
-
-          if (trickCluster.length !== 4) {
-            throw new Error();
-          }
-
-          const clusterGrabs = trickCluster.map((i) => cornerIndexToGrab[i]);
-
-          edgePosition = {
-            x:
-              clusterGrabs.reduce((acc, v) => acc + v.x, 0) /
-              clusterGrabs.length,
-            y:
-              clusterGrabs.reduce((acc, v) => acc + v.y, 0) /
-              clusterGrabs.length,
-            z:
-              clusterGrabs.reduce((acc, v) => acc + v.z, 0) /
-              clusterGrabs.length,
-          };
+          edgePosition = { x: 0, y: 0, z: 0 };
         } else if (cluster.length === 4 && config[x] === "1") {
+          edgePosition = { x: 0, y: 0, z: 0 };
         }
       } else if (config[x] === of) {
         if (balancedConfigurations.includes(config) || cluster.length === 4) {

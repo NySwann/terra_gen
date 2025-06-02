@@ -11,10 +11,21 @@ import { Terrain } from "../Terrain";
 import MainScene from "../../scenes/MainScene/MainScene";
 import { amanatidesWooAlgorithm } from "../ray";
 import type { Tool } from "./tool";
+import type { ReactNode } from "react";
+import { NumberInput, Stack } from "@mantine/core";
+import { createStore, type Store } from "../../../stores/store";
+import { useStoreValue } from "../../../hooks/useStore";
+import { type EraserToolOptions, EraserToolControl } from "./EraserToolControl";
 
 export class EraserTool implements Tool {
+  optionsStore: Store<EraserToolOptions> = createStore({ size: 0.1 });
   rendered: TransformNode;
   selectorMesh: Mesh;
+  control: ReactNode;
+
+  constructor() {
+    this.control = <EraserToolControl optionsStore={this.optionsStore} />;
+  }
 
   bind(terrain: Terrain, scene: MainScene) {
     console.log("bind tool");
@@ -29,7 +40,7 @@ export class EraserTool implements Tool {
 
     console.log(diameter)
 
-    const selectorMesh = MeshBuilder.CreateSphere("sphere", { diameter}, scene);
+    const selectorMesh = MeshBuilder.CreateSphere("sphere", { diameter }, scene);
     selectorMesh.isPickable = false;
     const selectorMeshMaterial = new StandardMaterial("", scene);
     selectorMeshMaterial.alpha = 0.4;
@@ -119,7 +130,7 @@ export class EraserTool implements Tool {
         const block = terrain.getBlock(x, y, z);
 
         if (!block) {
-          console.log(x, y, z);
+          return false;
         }
 
         return block.v === "solid";
@@ -159,10 +170,31 @@ export class EraserTool implements Tool {
       }
 
       if (e.button === 2 && lastPos) {
-        terrain.removeShit(lastPos.x, lastPos.y, lastPos.z);
+        const size = this.optionsStore.getValue().size;
+        const sphereRadius = size;
+        const sphereVector3 = { x: 0, y: 0, z: 0 };
+
+        for (let x = -Math.floor(size); x < Math.ceil(size); x++) {
+          for (let y = -Math.floor(size); y < Math.ceil(size); y++) {
+            for (let z = -Math.floor(size); z < Math.ceil(size); z++) {
+              const v =
+                Math.sqrt(
+                  (x - sphereVector3.x) * (x - sphereVector3.x) +
+                  (y - sphereVector3.y) * (y - sphereVector3.y) +
+                  + (z - sphereVector3.z) * (z - sphereVector3.z)
+                ) < sphereRadius;
+
+              if (v) {
+                terrain.setBlockMaterial(lastPos.x - + x, lastPos.y + y, lastPos.z + z, "gaz");
+              }
+            }
+          }
+        }
+
+        terrain.rerender();
       }
     };
   }
 
-  unbind() {}
+  unbind() { }
 }
