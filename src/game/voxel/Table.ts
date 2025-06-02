@@ -6,11 +6,15 @@ import {
   precomputed_configIndexToStr,
 } from "./TableComputed";
 
-interface Position { x: number; y: number; z: number }
+interface Position {
+  x: number;
+  y: number;
+  z: number;
+}
 
 type Configuration = [
   number,
-  number,
+    number,
   number,
   number,
   number,
@@ -92,7 +96,7 @@ export class Table {
     // configIndexToEdgePositions = precomputed_configIndexToEdgePositions;
 
     configIndexToStr = [];
-    configIndexToEdgePositions = {}
+    configIndexToEdgePositions = {};
 
     this.generateConfig(1, 1, [0, 0, 0, 0, 0, 0, 0, 0]);
     this.generateConfig(1, 2, [0, 0, 0, 0, 0, 0, 0, 0]);
