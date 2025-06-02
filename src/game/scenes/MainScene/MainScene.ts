@@ -1,7 +1,15 @@
-
 // import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 
-import { Scene, ArcRotateCamera, AbstractEngine, Tools, Vector3, HemisphericLight, DefaultRenderingPipeline } from "@babylonjs/core";
+import {
+  Scene,
+  ArcRotateCamera,
+  AbstractEngine,
+  Tools,
+  Vector3,
+  HemisphericLight,
+  DefaultRenderingPipeline,
+  Color4,
+} from "@babylonjs/core";
 import { Generator } from "../../voxel/Generator";
 import { Terrain } from "../../voxel/Terrain";
 import { Table } from "../../voxel/Table";
@@ -15,9 +23,10 @@ export default class MainScene extends Scene {
   constructor(engine: AbstractEngine) {
     super(engine);
 
+    this.clearColor = new Color4(0.0, 0.0, 0.06, 1.0);
+
     this._setCamera();
     this._setLight();
-    //  this._setEnvironment(scene);
 
     const table = new Table(this);
     const terrain = new Terrain(this);
@@ -51,10 +60,6 @@ export default class MainScene extends Scene {
   _setLight(): void {
     const light = new HemisphericLight("light", new Vector3(0, 1, 0), this);
     light.intensity = 0.5;
-  }
-
-  _setEnvironment() {
-    this.createDefaultEnvironment({ createGround: false, createSkybox: false });
   }
 
   _setPipeLine(): void {

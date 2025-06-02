@@ -3,18 +3,28 @@ import { useStoreValue } from "../../../hooks/useStore";
 import type { Store } from "../../../stores/store";
 
 interface EraserToolControlProps {
-    optionsStore: Store<EraserToolOptions>;
+  optionsStore: Store<EraserToolOptions>;
 }
 
 export function EraserToolControl({ optionsStore }: EraserToolControlProps) {
-    const options = useStoreValue(optionsStore);
+  const options = useStoreValue(optionsStore);
 
-    return <Stack>
-        <Text>Sphere Size</Text>
-        <Slider value={options.size} onChange={(size) => { optionsStore.setValue({ size: Number(size) }) }} min={0.1} max={10} />
+  return (
+    <Stack>
+      <Text>Sphere Size</Text>
+      <Slider
+        value={options.size}
+        onChange={(size) => {
+          optionsStore.setValue({ size: Number(size) });
+        }}
+        min={0.1}
+        max={10}
+        step={0.1}
+      />
     </Stack>
+  );
 }
 
 export interface EraserToolOptions {
-    size: number;
+  size: number;
 }
