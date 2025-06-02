@@ -25,7 +25,7 @@ export class EraserTool implements Tool {
     // in voxel grid space
     let lastPos: Vector3 | null = null;
 
-    const diameter = 4;
+    const diameter = 1.6;
 
     console.log(diameter)
 

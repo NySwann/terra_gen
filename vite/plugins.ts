@@ -1,14 +1,10 @@
-import react from '@vitejs/plugin-react'
+import react from '@vitejs/plugin-react-swc'
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import { createHtmlPlugin } from 'vite-plugin-html'
 
 export const vitePlugins = (env: Record<string, string>) => {
   return [
-
-    // tried @vitejs/plugin-react-swc, hmr broken
-    react({
-       include: "**/*.tsx",
-    }),
+    react(),
     vanillaExtractPlugin(),
     createHtmlPlugin({
       inject: {
@@ -16,6 +12,14 @@ export const vitePlugins = (env: Record<string, string>) => {
           title: env.VITE_APP_TITLE // Need to reference environment variables in html
         }
       }
-    })
+    }),
+    // full reload because hmr is broken
+    {
+      name: "full-reload",
+      handleHotUpdate({ server }) {
+        server.ws.send({ type: "full-reload" });
+        return [];
+      },
+    },
   ]
 }
