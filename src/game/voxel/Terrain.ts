@@ -107,7 +107,7 @@ export class Terrain {
   cubeMesh: Mesh;
   transparentSphereMesh: Mesh;
   triangles: Triangle[];
-  meshLines: [Vector3, Vector3][];
+  meshLines: [Point, Point][];
   ownerLines: [Vector3, Vector3][];
   debugLines: [Vector3, Vector3][];
   gridRoot: TransformNode;
@@ -260,7 +260,9 @@ export class Terrain {
             this.triangles = this.triangles.filter(t => t.quad !== quad);
             quad.lines.forEach(l => {
               l.quads = l.quads.filter(q => q !== quad);
-            })
+            });
+            this.meshLines = this.meshLines.filter(l => (l[0] !== quad.points[0] || l[1] !== quad.points[2]) && (l[1] !== quad.points[0] || l[0] !== quad.points[2]));
+            this.meshLines = this.meshLines.filter(l => (l[0] !== quad.points[1] || l[1] !== quad.points[3]) && (l[1] !== quad.points[1] || l[0] !== quad.points[3]));
           }
         }
       }
@@ -352,7 +354,7 @@ export class Terrain {
     );
 
     if (diff < 0.9) {
-      this.meshLines.push([triangles[0].points[0].position, triangles[0].points[2].position]);
+      this.meshLines.push([triangles[0].points[0], triangles[0].points[2]]);
     }
 
     this.checkLinesForQuadDissolve(p1.lines);
@@ -378,7 +380,7 @@ export class Terrain {
     }
 
     if (!p1.lines.some((l) => is_line(l, p1, p2))) {
-      this.meshLines.push([p1.position, p2.position]);
+      this.meshLines.push([p1, p2]);
 
       const line = { a: p1, b: p2, quads: [] };
 
@@ -701,7 +703,7 @@ export class Terrain {
       "lineSystem",
       {
         lines: this.meshLines.map((l) =>
-          l.map((li) => new Vector3(li.x, li.y, li.z))
+          l.map((li) => new Vector3(li.position.x, li.position.y, li.position.z))
         ),
       },
       this.scene
