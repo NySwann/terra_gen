@@ -84,8 +84,8 @@ function eqn(a: number, b: number) {
 function distance(a: Vector3, b: Vector3) {
   return Math.sqrt(
     (a.x - b.x) * (a.x - b.x) +
-      (a.y - b.y) * (a.y - b.y) +
-      (a.z - b.z) * (a.z - b.z)
+    (a.y - b.y) * (a.y - b.y) +
+    (a.z - b.z) * (a.z - b.z)
   );
 }
 
@@ -209,13 +209,6 @@ export class Terrain {
 
   getBlock(x: number, y: number, z: number) {
     return this.blocks[x * (this.size * this.size) + y * this.size + z];
-  }
-
-  removeShit(x: number, y: number, z: number) {
-    //console.log(this.getBlock(x, y, z));
-    this.setBlockMaterial(x, y, z, "gaz");
-
-    this.rerender();
   }
 
   minBound(): Vector3 {
@@ -498,7 +491,7 @@ export class Terrain {
                 for (const selfAxisCornerIndex of selfAxisCornerIndexes) {
                   const selfEdge =
                     cornerData.edges[
-                      cornerIndexToEdgeIndex[selfAxisCornerIndex]
+                    cornerIndexToEdgeIndex[selfAxisCornerIndex]
                     ];
 
                   if (selfEdge) {
@@ -525,10 +518,10 @@ export class Terrain {
                         const otherCornerIndex = selfAxisCornerIndexes.find(
                           (i) =>
                             cornerIndexToPosition[selfAxisCornerIndex][
-                              otherAxis
+                            otherAxis
                             ] !== cornerIndexToPosition[i][otherAxis] &&
                             cornerIndexToPosition[selfAxisCornerIndex][
-                              lastAxis
+                            lastAxis
                             ] === cornerIndexToPosition[i][lastAxis]
                         )!;
 
@@ -538,7 +531,7 @@ export class Terrain {
 
                         const otherEdge =
                           cornerData.edges[
-                            cornerIndexToEdgeIndex[otherCornerIndex]
+                          cornerIndexToEdgeIndex[otherCornerIndex]
                           ];
 
                         if (otherEdge) {
@@ -577,10 +570,10 @@ export class Terrain {
                             revertedSelfAxisCornerIndexes.find(
                               (i) =>
                                 cornerIndexToPosition[selfAxisCornerIndex][
-                                  otherAxis
+                                otherAxis
                                 ] == cornerIndexToPosition[i][otherAxis] &&
                                 cornerIndexToPosition[selfAxisCornerIndex][
-                                  lastAxis
+                                lastAxis
                                 ] !== cornerIndexToPosition[i][lastAxis]
                             )!;
 
@@ -590,7 +583,7 @@ export class Terrain {
 
                           const farOpposedEdge =
                             farOpposedCornerData.edges[
-                              cornerIndexToEdgeIndex[farOpposedCornerIndex]
+                            cornerIndexToEdgeIndex[farOpposedCornerIndex]
                             ];
 
                           if (farOpposedEdge) {
