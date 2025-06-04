@@ -25,8 +25,15 @@ import {
 } from "./Table";
 import MainScene from "../scenes/MainScene/MainScene";
 
+interface Triangle {
+  points: [Point, Point, Point];
+  quad: Quad;
+}
+
 interface Quad {
   points: [Point, Point, Point, Point];
+  lines: [Line, Line, Line, Line];
+  triangles: [Triangle, Triangle];
 }
 
 interface Line {
@@ -99,7 +106,7 @@ export class Terrain {
   voxels: Voxel[];
   cubeMesh: Mesh;
   transparentSphereMesh: Mesh;
-  triangles: [Vector3, Vector3, Vector3][];
+  triangles: Triangle[];
   meshLines: [Vector3, Vector3][];
   ownerLines: [Vector3, Vector3][];
   debugLines: [Vector3, Vector3][];
@@ -245,6 +252,21 @@ export class Terrain {
     return point;
   }
 
+  checkLinesForQuadDissolve(lines: Line[]) {
+    for (const line of lines) {
+      if (line.quads.length > 2) {
+        for (const quad of line.quads) {
+          if (quad.lines.every(l => l.quads.length > 2)) {
+            this.triangles = this.triangles.filter(t => t.quad !== quad);
+            quad.lines.forEach(l => {
+              l.quads = l.quads.filter(q => q !== quad);
+            })
+          }
+        }
+      }
+    }
+  }
+
   makeQuad(p1: Point, p2: Point, p3: Point, p4: Point) {
     if (new Set([p1, p2, p3, p4]).size !== 4) {
       return;
@@ -259,29 +281,30 @@ export class Terrain {
     //   return;
     // }
 
-    const quad: Quad = { points: [p1, p2, p3, p4] };
+    const lines: [Line, Line, Line, Line] = [p1.lines.find((l) => is_line(l, p1, p2))!, p2.lines.find((l) => is_line(l, p2, p3))!, p3.lines.find((l) => is_line(l, p3, p4))!, p4.lines.find((l) => is_line(l, p4, p1))!];
 
-    p1.lines.find((l) => is_line(l, p1, p2))!.quads.push(quad);
-    p2.lines.find((l) => is_line(l, p2, p3))!.quads.push(quad);
-    p3.lines.find((l) => is_line(l, p3, p4))!.quads.push(quad);
-    p4.lines.find((l) => is_line(l, p4, p1))!.quads.push(quad);
+    const quad: Quad = { points: [p1, p2, p3, p4], lines };
+
+    lines.forEach(l => l.quads.push(quad));
 
     const d1 = distance(p1.position, p3.position);
     const d2 = distance(p2.position, p4.position);
 
-    let triangles;
+    let triangles: [Triangle, Triangle];
 
     if (d1 <= d2) {
       triangles = [
-        [p1.position, p2.position, p3.position],
-        [p3.position, p4.position, p1.position],
+        { points: [p1, p2, p3], quad },
+        { points: [p3, p4, p1], quad },
       ];
     } else {
       triangles = [
-        [p2.position, p3.position, p4.position],
-        [p4.position, p1.position, p2.position],
+        { points: [p2, p3, p4], quad },
+        { points: [p4, p1, p2], quad },
       ];
     }
+
+    quad.triangles = triangles;
 
     this.triangles.push(...triangles);
 
@@ -292,14 +315,14 @@ export class Terrain {
     }
 
     const a1 = new Vector3(
-      triangles[0][1].x - triangles[0][0].x,
-      triangles[0][1].y - triangles[0][0].y,
-      triangles[0][1].z - triangles[0][0].z
+      triangles[0].points[1].position.x - triangles[0].points[0].position.x,
+      triangles[0].points[1].position.y - triangles[0].points[0].position.y,
+      triangles[0].points[1].position.z - triangles[0].points[0].position.z
     );
     const b1 = new Vector3(
-      triangles[0][2].x - triangles[0][0].x,
-      triangles[0][2].y - triangles[0][0].y,
-      triangles[0][2].z - triangles[0][0].z
+      triangles[0].points[2].position.x - triangles[0].points[0].position.x,
+      triangles[0].points[2].position.y - triangles[0].points[0].position.y,
+      triangles[0].points[2].position.z - triangles[0].points[0].position.z
     );
     const n1 = new Vector3(
       a1.y * b1.z - a1.z * b1.y,
@@ -308,14 +331,14 @@ export class Terrain {
     );
 
     const a2 = new Vector3(
-      triangles[1][1].x - triangles[1][0].x,
-      triangles[1][1].y - triangles[1][0].y,
-      triangles[1][1].z - triangles[1][0].z
+      triangles[1].points[1].position.x - triangles[1].points[0].position.x,
+      triangles[1].points[1].position.y - triangles[1].points[0].position.y,
+      triangles[1].points[1].position.z - triangles[1].points[0].position.z
     );
     const b2 = new Vector3(
-      triangles[1][2].x - triangles[1][0].x,
-      triangles[1][2].y - triangles[1][0].y,
-      triangles[1][2].z - triangles[1][0].z
+      triangles[1].points[2].position.x - triangles[1].points[0].position.x,
+      triangles[1].points[2].position.y - triangles[1].points[0].position.y,
+      triangles[1].points[2].position.z - triangles[1].points[0].position.z
     );
     const n2 = new Vector3(
       a2.y * b2.z - a2.z * b2.y,
@@ -329,8 +352,13 @@ export class Terrain {
     );
 
     if (diff < 0.9) {
-      this.meshLines.push([triangles[0][0], triangles[0][2]]);
+      this.meshLines.push([triangles[0].points[0].position, triangles[0].points[2].position]);
     }
+
+    this.checkLinesForQuadDissolve(p1.lines);
+    this.checkLinesForQuadDissolve(p2.lines);
+    this.checkLinesForQuadDissolve(p3.lines);
+    this.checkLinesForQuadDissolve(p4.lines);
   }
 
   linkEdge(edge1: Point, edge2: Point) {
@@ -754,11 +782,11 @@ export class Terrain {
     const indices: number[] = [];
 
     this.triangles.forEach((t, i) => {
-      positions.push(t[0].x, t[0].y, t[0].z);
+      positions.push(t.points[0].position.x, t.points[0].position.y, t.points[0].position.z);
       indices.push(indices.length);
-      positions.push(t[1].x, t[1].y, t[1].z);
+      positions.push(t.points[1].position.x, t.points[1].position.y, t.points[1].position.z);
       indices.push(indices.length);
-      positions.push(t[2].x, t[2].y, t[2].z);
+      positions.push(t.points[2].position.x, t.points[2].position.y, t.points[2].position.z);
       indices.push(indices.length);
     });
 
