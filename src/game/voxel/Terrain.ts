@@ -7,6 +7,8 @@ import {
   Matrix,
   Mesh,
   MeshBuilder,
+  PhysicsAggregate,
+  PhysicsShapeType,
   StandardMaterial,
   TransformNode,
   Vector2,
@@ -115,6 +117,7 @@ export class Terrain {
   gridRoot: TransformNode;
   rendered: TransformNode;
   editBounds: { min: Vector3, max: Vector3 } | null;
+  terrainMesh: Mesh;
 
   constructor(scene: MainScene) {
     this.scene = scene;
@@ -894,5 +897,9 @@ export class Terrain {
     mat.disableLighting = true;
     //mat.wireframe = true;
     customMesh.material = mat;
+
+    this.terrainMesh = customMesh;
+
+    new PhysicsAggregate(this.terrainMesh, PhysicsShapeType.MESH, { mass: 0 }, this.scene);
   }
 }

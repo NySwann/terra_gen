@@ -32,10 +32,16 @@ export class Game {
       disableWebGL2Support: false,
     });
 
+
     this.scene = new MainScene(this.engine);
 
-    // Add physics. If not needed, you can annotate it to improve loading speed and environment performance.
-    await this._setPhysics();
+    const gravity = new Vector3(0, -9.81, 0);
+    const hk = await HavokPhysics();
+    const plugin = new HavokPlugin(true, hk);
+
+    this.scene.enablePhysics(gravity, plugin);
+
+    this.scene.load();
 
     this._config();
     this._renderer();
@@ -51,17 +57,18 @@ export class Game {
 
     this.scene = new MainScene(this.engine);
 
-    // Add physics. If not needed, you can annotate it to improve loading speed and environment performance.
-    await this._setPhysics();
-
     this._config();
     this._renderer();
   }
 
-  async _setPhysics(): Promise<void> {
+  async _physicsPlugin(): Promise<void> {
     const gravity = new Vector3(0, -9.81, 0);
     const hk = await HavokPhysics();
     const plugin = new HavokPlugin(true, hk);
+    this.scene.enablePhysics(gravity, plugin);
+  }
+
+  async _enablePhysics(): Promise<void> {
     this.scene.enablePhysics(gravity, plugin);
   }
 
@@ -72,7 +79,7 @@ export class Game {
 
   _fps(): void {
     const dom = document.getElementById("display-fps");
-    
+
     if (dom) {
       dom.innerHTML = `${this.engine.getFps().toFixed()} fps`;
     }

@@ -6,6 +6,8 @@ import {
   Matrix,
   TransformNode,
   Mesh,
+  PhysicsAggregate,
+  PhysicsShapeType,
 } from "@babylonjs/core";
 import { Terrain } from "../Terrain";
 import MainScene from "../../scenes/MainScene/MainScene";
@@ -163,10 +165,20 @@ export class EraserTool implements Tool {
 
     scene.onPointerDown = (e) => {
       //console.log(lastPos);
+      if (e.button == 1) {
+        const mesh = MeshBuilder.CreateSphere("sphere", { diameter: 2, segments: 32 }, scene);
+
+        mesh.position.y = 50;
+        mesh.position.x = Math.random() * 50 - 25;
+        mesh.position.z = Math.random() * 50 - 25;
+
+        new PhysicsAggregate(mesh, PhysicsShapeType.SPHERE, { mass: 1, restitution: 0.75 }, scene);
+      }
 
       if (e.button === 0 && lastPos) {
         console.log(lastPos);
         console.log(terrain.getVoxel(lastPos.x, lastPos.y, lastPos.z));
+        return;
       }
 
       if (e.button === 2 && lastPos) {

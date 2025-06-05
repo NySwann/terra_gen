@@ -9,6 +9,9 @@ import {
   HemisphericLight,
   DefaultRenderingPipeline,
   Color4,
+  PhysicsAggregate,
+  MeshBuilder,
+  PhysicsShapeType,
 } from "@babylonjs/core";
 import { Generator } from "../../voxel/Generator";
 import { Terrain } from "../../voxel/Terrain";
@@ -19,6 +22,7 @@ import type { Tool } from "../../voxel/tools/tool";
 export default class MainScene extends Scene {
   camera: ArcRotateCamera;
   tool: Tool;
+  terrain: Terrain;
 
   constructor(engine: AbstractEngine) {
     super(engine);
@@ -31,18 +35,22 @@ export default class MainScene extends Scene {
     const table = new Table(this);
     const terrain = new Terrain(this);
 
-    const generator = new Generator();
-
-    generator.fill(terrain);
-
-    terrain.compute();
-    terrain.render();
+    this.terrain = terrain;
 
     const tool = new EraserTool();
 
     tool.bind(terrain, this);
 
     this.tool = tool;
+  }
+
+  load(): void {
+    const generator = new Generator();
+
+    generator.fill(this.terrain);
+
+    this.terrain.compute();
+    this.terrain.render();
   }
 
   _setCamera(): void {
