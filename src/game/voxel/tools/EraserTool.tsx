@@ -170,6 +170,8 @@ export class EraserTool implements Tool {
       }
 
       if (e.button === 2 && lastPos) {
+        console.log("remove");
+
         const size = this.optionsStore.getValue().size;
         const sphereRadius = size;
         const sphereVector3 = { x: 0, y: 0, z: 0 };
@@ -185,11 +187,17 @@ export class EraserTool implements Tool {
                 ) < sphereRadius;
 
               if (v) {
-                terrain.setBlockMaterial(lastPos.x - + x, lastPos.y + y, lastPos.z + z, "gaz");
+                const pos = new Vector3(lastPos.x - + x, lastPos.y + y, lastPos.z + z);
+
+                if (pos.x >= 0 && pos.y >= 0 && pos.z >= 0 && pos.x < terrain.size && pos.y < terrain.size && pos.z < terrain.size) {
+                  terrain.setBlockMaterial(lastPos.x - + x, lastPos.y + y, lastPos.z + z, "gaz");
+                }
               }
             }
           }
         }
+
+        console.log("re-render");
 
         terrain.rerender();
       }

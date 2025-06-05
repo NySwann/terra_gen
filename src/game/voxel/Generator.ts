@@ -22,8 +22,8 @@ export class Generator {
   random: () => number;
 
   constructor() {
-    //const seed = [Math.floor(Math.random() * 100), Math.floor(Math.random() * 100), Math.floor(Math.random() * 100), Math.floor(Math.random() * 100)];
-    const seed = [85, 44, 74, 6];
+    const seed = [Math.floor(Math.random() * 100), Math.floor(Math.random() * 100), Math.floor(Math.random() * 100), Math.floor(Math.random() * 100)];
+    //const seed = [85, 44, 74, 6];
     console.log("seed", seed);
     this.random = sfc32(seed[0], seed[1], seed[2], seed[3]);
     this.noise = mkSimplexNoise(this.random);
@@ -33,12 +33,26 @@ export class Generator {
     for (let x = 0; x < terrain.size; x++) {
       for (let y = 0; y < terrain.size; y++) {
         for (let z = 0; z < terrain.size; z++) {
-          const sample = this.sample(x, y, z, terrain.size);
+          const sample = this.sample1(x, y, z, terrain.size);
           //if (z > 40)
           terrain.setBlockMaterial(x, y, z, sample ? "solid" : "gaz");
         }
       }
     }
+  }
+
+  sample1(x: number, y: number, z: number, size: number) {
+    let v = false;
+
+    v ||= y < 10;
+
+    v ||=
+      this.noise.noise2D(x / 32, z / 32) * this.noise.noise2D(x / 16, z / 16) > (y / (size / 2)) - 0.5
+
+    v &&=
+      x > 2 && x < size - 2 && y > 2 && y < size - 2 && z > 2 && z < size - 2;
+
+    return v;
   }
 
   sample(x: number, y: number, z: number, size: number) {
@@ -77,20 +91,20 @@ export class Generator {
     v ||=
       Math.sqrt(
         (x - sphereVector3.x) * (x - sphereVector3.x) +
-          (y - sphereVector3.y) * (y - sphereVector3.y) +
-          +(z - sphereVector3.z) * (z - sphereVector3.z)
+        (y - sphereVector3.y) * (y - sphereVector3.y) +
+        +(z - sphereVector3.z) * (z - sphereVector3.z)
       ) < sphereRadius &&
       !(
         this.noise.noise3D(x / 32, y / 32, z / 32) +
-          this.noise.noise3D(x / 16, y / 16, z / 16) >=
+        this.noise.noise3D(x / 16, y / 16, z / 16) >=
         0.5
       );
 
     if (
       Math.sqrt(
         (x - sphereVector3.x) * (x - sphereVector3.x) +
-          (y - sphereVector3.y) * (y - sphereVector3.y) +
-          +(z - sphereVector3.z) * (z - sphereVector3.z)
+        (y - sphereVector3.y) * (y - sphereVector3.y) +
+        +(z - sphereVector3.z) * (z - sphereVector3.z)
       ) <
       sphereRadius - 5
     ) {
@@ -143,8 +157,8 @@ export class Generator {
     v ||=
       Math.sqrt(
         (x - sphereVector3.x) * (x - sphereVector3.x) +
-          (y - sphereVector3.y) * (y - sphereVector3.y) +
-          +(z - sphereVector3.z) * (z - sphereVector3.z)
+        (y - sphereVector3.y) * (y - sphereVector3.y) +
+        +(z - sphereVector3.z) * (z - sphereVector3.z)
       ) < sphereRadius;
 
     v ||= x === 6 && y === 6 && z === 6;

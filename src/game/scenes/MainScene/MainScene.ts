@@ -35,6 +35,7 @@ export default class MainScene extends Scene {
 
     generator.fill(terrain);
 
+    terrain.compute();
     terrain.render();
 
     const tool = new EraserTool();

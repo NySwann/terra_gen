@@ -28,6 +28,7 @@ import MainScene from "../scenes/MainScene/MainScene";
 interface Triangle {
   points: [Point, Point, Point];
   quad: Quad;
+  dead: boolean;
 }
 
 interface Quad {
@@ -45,6 +46,7 @@ interface Line {
 interface Point {
   position: Vector3;
   lines: Line[];
+  dead: boolean;
 }
 type Material = "gaz" | "solid";
 
@@ -112,16 +114,19 @@ export class Terrain {
   debugLines: [Vector3, Vector3][];
   gridRoot: TransformNode;
   rendered: TransformNode;
+  editBounds: { min: Vector3, max: Vector3 } | null;
 
   constructor(scene: MainScene) {
     this.scene = scene;
 
-    this.size = 50;
+    this.size = 60;
     this.blocks = new Array(this.size * this.size * this.size)
       .fill(null)
       .map(() => ({
         v: "gaz",
       }));
+
+    this.editBounds = null;;
 
     this.prepareVoxels();
 
@@ -153,7 +158,6 @@ export class Terrain {
           switch (kbInfo.event.key) {
             case "d":
               debug = !debug;
-              this.prepareVoxels();
               this.rendered.dispose();
               this.rendered = new TransformNode("root2", this.scene);
               this.rendered.parent = this.gridRoot;
@@ -161,7 +165,6 @@ export class Terrain {
               break;
             case "l":
               lines = !lines;
-              this.prepareVoxels();
               this.rendered.dispose();
               this.rendered = new TransformNode("root2", this.scene);
               this.rendered.parent = this.gridRoot;
@@ -173,7 +176,6 @@ export class Terrain {
   }
 
   render() {
-    this.compute();
     !debug && this.draw();
 
     lines && this.drawMeshLines();
@@ -182,14 +184,25 @@ export class Terrain {
     debug && this.drawEdges();
     debug && this.drawOwnerLines();
     debug && this.drawDebugLines();
+
+    this.editBounds = null;
   }
 
   rerender() {
+    if (!this.editBounds) {
+      return;
+    }
+
+    console.log(`(${this.editBounds.min.x.toString()} -> ${this.editBounds.max.x.toString()}, ${this.editBounds.min.y.toString()} -> ${this.editBounds.max.y.toString()}, ${this.editBounds.min.z.toString()} -> ${this.editBounds.max.z.toString()})`)
+
+    this.removePoints();
     this.rendered.dispose();
     this.rendered = new TransformNode("root2", this.scene);
     this.rendered.parent = this.gridRoot;
-    this.prepareVoxels();
+    this.compute();
     this.render();
+
+    this.editBounds = null;
   }
 
   prepareVoxels() {
@@ -206,8 +219,26 @@ export class Terrain {
     this.debugLines = [];
   }
 
-  setBlockMaterial(x: number, y: number, z: number, v: "solid" | "gaz") {
-    return (this.blocks[x * (this.size * this.size) + y * this.size + z].v = v);
+  setBlockMaterial(x: number, y: number, z: number, v: "solid" | "gaz"): void {
+    if (x < 0 || y < 0 || z < 0 || x >= this.size || y >= this.size || z >= this.size) {
+      throw new Error(`Out of bounds: (${x.toString()}, ${y.toString()}, ${z.toString()})`);
+    }
+
+    const block = this.blocks[x * (this.size * this.size) + y * this.size + z];
+
+    if (block.v === v) {
+      return;
+    }
+
+    const position = new Vector3(x, y, z);
+
+    if (!this.editBounds) {
+      this.editBounds = { min: position, max: position };
+    } else {
+      this.editBounds = { min: Vector3.Minimize(position, this.editBounds.min), max: Vector3.Maximize(position, this.editBounds.max) };
+    }
+
+    this.blocks[x * (this.size * this.size) + y * this.size + z].v = v;
   }
 
   getVoxel(x: number, y: number, z: number) {
@@ -231,10 +262,10 @@ export class Terrain {
   }
 
   getPoint(x: number, y: number, z: number): Point {
-    const voxel = this.getVoxel(Math.floor(x), Math.floor(y), Math.floor(z));
+    const voxel = this.getVoxel(Math.round(x), Math.round(y), Math.round(z));
 
     if (!voxel) {
-      //console.log(x, y, z);
+      throw new Error();
     }
 
     for (const point of voxel.points) {
@@ -245,7 +276,7 @@ export class Terrain {
       }
     }
 
-    const point = { position: new Vector3(x, y, z), lines: [] };
+    const point = { position: new Vector3(x, y, z), lines: [], dead: false };
 
     voxel.points.push(point);
 
@@ -296,13 +327,13 @@ export class Terrain {
 
     if (d1 <= d2) {
       triangles = [
-        { points: [p1, p2, p3], quad },
-        { points: [p3, p4, p1], quad },
+        { points: [p1, p2, p3], quad, dead: false },
+        { points: [p3, p4, p1], quad, dead: false },
       ];
     } else {
       triangles = [
-        { points: [p2, p3, p4], quad },
-        { points: [p4, p1, p2], quad },
+        { points: [p2, p3, p4], quad, dead: false },
+        { points: [p4, p1, p2], quad, dead: false },
       ];
     }
 
@@ -472,160 +503,209 @@ export class Terrain {
     }
   }
 
-  compute() {
-    for (let x = 0; x < this.size - 1; x++) {
-      for (let y = 0; y < this.size - 1; y++) {
-        for (let z = 0; z < this.size - 1; z++) {
-          this.computeEdges(x, y, z);
-          if (x < this.size - 2) {
-            this.computeEdges(x + 1, y, z);
-          }
-          if (y < this.size - 2) {
-            this.computeEdges(x, y + 1, z);
-          }
-          if (z < this.size - 2) {
-            this.computeEdges(x, y, z + 1);
+  removePoints() {
+    const min = new Vector3(Math.max(this.editBounds?.min.x - 1, 0), Math.max(this.editBounds?.min.y - 1, 0), Math.max(this.editBounds?.min.z - 1, 0));
+    const max = new Vector3(Math.min(this.editBounds?.max.x + 2, this.size), Math.min(this.editBounds?.max.y + 2, this.size), Math.min(this.editBounds?.max.z + 2, this.size));
+
+    for (let x = min.x; x < max.x; x++) {
+      for (let y = min.y; y < max.y; y++) {
+        for (let z = min.z; z < max.z; z++) {
+          const voxel = this.getVoxel(x, y, z);
+
+          if (!voxel) {
+            throw new Error();
           }
 
-          if (x > 1 && y > 1 && z > 1) {
-            const cornerData = this.getVoxel(x, y, z);
+          for (const point of voxel.points) {
+            point.dead = true;
 
-            if (
-              !cornerData.edgesConfigs.some(
-                (c) => c !== "00000000" && c !== "11111111" && c !== null
-              )
-            ) {
-              continue;
+            for (const line of point.lines) {
+              if (line.a === point) {
+                line.b.lines = line.b.lines.filter(l => l !== line);
+              } else {
+                line.a.lines = line.a.lines.filter(l => l !== line);
+              }
+
+              for (const quad of line.quads) {
+                for (const otherLine of quad.lines) {
+                  if (otherLine !== line) {
+                    otherLine.quads = otherLine.quads.filter(q => q !== quad);
+                  }
+                }
+
+                for (const triangle of quad.triangles) {
+                  triangle.dead = true;
+                }
+              }
             }
+          }
 
-            const allSelf = cornerData.edges.every((e) => e !== null);
+          voxel.edges = [null, null, null, null, null, null, null, null];
+          voxel.edgesConfigs = [null, null, null, null, null, null, null, null];
+          voxel.points = [];
+        }
+      }
+    }
 
-            axisDirection.forEach((sign) => {
-              axisNames.forEach((axis) => {
-                const selfAxisCornerIndexes = cornerIndexToPosition
-                  .map((c, i) => (c[axis] === (sign === -1 ? 1 : 0) ? i : -1)) // -1 c'est 1 car  [0    1]X[0    1]
-                  .filter((i) => i >= 0);
+    this.meshLines = this.meshLines.filter(l => !l[0].dead && !l[1].dead);
+    this.triangles = this.triangles.filter(t => !t.dead);
+  }
 
-                if (selfAxisCornerIndexes.length !== 4) {
-                  throw new Error();
-                }
+  compute() {
+    const min = new Vector3(Math.max(this.editBounds?.min.x - 2, 0), Math.max(this.editBounds?.min.y - 2, 0), Math.max(this.editBounds?.min.z - 2, 0));
+    const max = new Vector3(Math.min(this.editBounds?.max.x + 2, this.size - 1), Math.min(this.editBounds?.max.y + 2, this.size - 1), Math.min(this.editBounds?.max.z + 2, this.size - 1));
 
-                const revertedSelfAxisCornerIndexes = cornerIndexToPosition
-                  .map((c, i) => (c[axis] === (sign === -1 ? 0 : 1) ? i : -1)) // -1 c'est 1 car  [0    1]X[0    1]
-                  .filter((i) => i >= 0);
+    for (let x = min.x; x < max.x; x++) {
+      for (let y = min.y; y < max.y; y++) {
+        for (let z = min.z; z < max.z; z++) {
+          this.computeEdges(x, y, z);
+        }
+      }
+    }
 
-                if (revertedSelfAxisCornerIndexes.length !== 4) {
-                  throw new Error();
-                }
+    const min2 = new Vector3(Math.max(this.editBounds?.min.x - 4, 0), Math.max(this.editBounds?.min.y - 4, 0), Math.max(this.editBounds?.min.z - 4, 0));
+    const max2 = new Vector3(Math.min(this.editBounds?.max.x + 4, this.size - 1), Math.min(this.editBounds?.max.y + 4, this.size - 1), Math.min(this.editBounds?.max.z + 4, this.size - 1));
 
-                for (const selfAxisCornerIndex of selfAxisCornerIndexes) {
-                  const selfEdge =
-                    cornerData.edges[
-                    cornerIndexToEdgeIndex[selfAxisCornerIndex]
-                    ];
+    for (let x = min2.x; x < max2.x; x++) {
+      for (let y = min2.y; y < max2.y; y++) {
+        for (let z = min2.z; z < max2.z; z++) {
+          const cornerData = this.getVoxel(x, y, z);
 
-                  if (selfEdge) {
-                    this.ownerLines.push([
-                      new Vector3(x, y, z),
-                      new Vector3(
-                        selfEdge.position.x,
-                        selfEdge.position.y,
-                        selfEdge.position.z
-                      ),
-                    ]);
+          if (
+            !cornerData.edgesConfigs.some(
+              (c) => c !== "00000000" && c !== "11111111" && c !== null
+            )
+          ) {
+            continue;
+          }
 
-                    axisNames
-                      .filter((a) => axis !== a)
-                      .map((otherAxis) => {
-                        const lastAxis = axisNames.find(
-                          (a) => a !== axis && a !== otherAxis
-                        );
+          const allSelf = cornerData.edges.every((e) => e !== null);
 
-                        if (lastAxis === undefined) {
-                          throw new Error("tf1");
+          axisDirection.forEach((sign) => {
+            axisNames.forEach((axis) => {
+              const selfAxisCornerIndexes = cornerIndexToPosition
+                .map((c, i) => (c[axis] === (sign === -1 ? 1 : 0) ? i : -1)) // -1 c'est 1 car  [0    1]X[0    1]
+                .filter((i) => i >= 0);
+
+              if (selfAxisCornerIndexes.length !== 4) {
+                throw new Error();
+              }
+
+              const revertedSelfAxisCornerIndexes = cornerIndexToPosition
+                .map((c, i) => (c[axis] === (sign === -1 ? 0 : 1) ? i : -1)) // -1 c'est 1 car  [0    1]X[0    1]
+                .filter((i) => i >= 0);
+
+              if (revertedSelfAxisCornerIndexes.length !== 4) {
+                throw new Error();
+              }
+
+              for (const selfAxisCornerIndex of selfAxisCornerIndexes) {
+                const selfEdge =
+                  cornerData.edges[
+                  cornerIndexToEdgeIndex[selfAxisCornerIndex]
+                  ];
+
+                if (selfEdge) {
+                  this.ownerLines.push([
+                    new Vector3(x, y, z),
+                    new Vector3(
+                      selfEdge.position.x,
+                      selfEdge.position.y,
+                      selfEdge.position.z
+                    ),
+                  ]);
+
+                  axisNames
+                    .filter((a) => axis !== a)
+                    .map((otherAxis) => {
+                      const lastAxis = axisNames.find(
+                        (a) => a !== axis && a !== otherAxis
+                      );
+
+                      if (lastAxis === undefined) {
+                        throw new Error("tf1");
+                      }
+
+                      const otherCornerIndex = selfAxisCornerIndexes.find(
+                        (i) =>
+                          cornerIndexToPosition[selfAxisCornerIndex][
+                          otherAxis
+                          ] !== cornerIndexToPosition[i][otherAxis] &&
+                          cornerIndexToPosition[selfAxisCornerIndex][
+                          lastAxis
+                          ] === cornerIndexToPosition[i][lastAxis]
+                      )!;
+
+                      if (otherCornerIndex === undefined) {
+                        throw new Error("tf2");
+                      }
+
+                      const otherEdge =
+                        cornerData.edges[
+                        cornerIndexToEdgeIndex[otherCornerIndex]
+                        ];
+
+                      if (otherEdge) {
+                        this.linkEdge(selfEdge, otherEdge);
+                      }
+
+                      const farOpposedCornerData = this.getVoxel(
+                        x + (axis === "x" ? sign : 0),
+                        y + (axis === "y" ? sign : 0),
+                        z + (axis === "z" ? sign : 0)
+                      );
+
+                      const allFar = farOpposedCornerData.edges.every(
+                        (e) => e !== null
+                      );
+
+                      if (!allSelf && !allFar) {
+                        if (x == 13 && y == 38 && z == 36) {
+                          // console.log(cornerData);
+                          // console.log(farOpposedCornerData);
                         }
+                        if (
+                          x == 13 &&
+                          y == 37 &&
+                          z == 36 &&
+                          axis == "y" &&
+                          sign == 1
+                        ) {
+                          // console.log(cornerData);
+                          // console.log(cornerData.edges.every(e => e !== null))
+                          // console.log(farOpposedCornerData);
+                          // console.log(farOpposedCornerData.edges.every(e => e !== null));
+                          // console.log(farOpposedCornerData.edges);
+                        }
+                        const farOpposedCornerIndex =
+                          revertedSelfAxisCornerIndexes.find(
+                            (i) =>
+                              cornerIndexToPosition[selfAxisCornerIndex][
+                              otherAxis
+                              ] == cornerIndexToPosition[i][otherAxis] &&
+                              cornerIndexToPosition[selfAxisCornerIndex][
+                              lastAxis
+                              ] !== cornerIndexToPosition[i][lastAxis]
+                          )!;
 
-                        const otherCornerIndex = selfAxisCornerIndexes.find(
-                          (i) =>
-                            cornerIndexToPosition[selfAxisCornerIndex][
-                            otherAxis
-                            ] !== cornerIndexToPosition[i][otherAxis] &&
-                            cornerIndexToPosition[selfAxisCornerIndex][
-                            lastAxis
-                            ] === cornerIndexToPosition[i][lastAxis]
-                        )!;
-
-                        if (otherCornerIndex === undefined) {
+                        if (farOpposedCornerIndex === undefined) {
                           throw new Error("tf2");
                         }
 
-                        const otherEdge =
-                          cornerData.edges[
-                          cornerIndexToEdgeIndex[otherCornerIndex]
+                        const farOpposedEdge =
+                          farOpposedCornerData.edges[
+                          cornerIndexToEdgeIndex[farOpposedCornerIndex]
                           ];
 
-                        if (otherEdge) {
-                          this.linkEdge(selfEdge, otherEdge);
+                        if (farOpposedEdge) {
+                          this.linkEdge(selfEdge, farOpposedEdge);
                         }
-
-                        const farOpposedCornerData = this.getVoxel(
-                          x + (axis === "x" ? sign : 0),
-                          y + (axis === "y" ? sign : 0),
-                          z + (axis === "z" ? sign : 0)
-                        );
-
-                        const allFar = farOpposedCornerData.edges.every(
-                          (e) => e !== null
-                        );
-
-                        if (!allSelf && !allFar) {
-                          if (x == 13 && y == 38 && z == 36) {
-                            // console.log(cornerData);
-                            // console.log(farOpposedCornerData);
-                          }
-                          if (
-                            x == 13 &&
-                            y == 37 &&
-                            z == 36 &&
-                            axis == "y" &&
-                            sign == 1
-                          ) {
-                            // console.log(cornerData);
-                            // console.log(cornerData.edges.every(e => e !== null))
-                            // console.log(farOpposedCornerData);
-                            // console.log(farOpposedCornerData.edges.every(e => e !== null));
-                            // console.log(farOpposedCornerData.edges);
-                          }
-                          const farOpposedCornerIndex =
-                            revertedSelfAxisCornerIndexes.find(
-                              (i) =>
-                                cornerIndexToPosition[selfAxisCornerIndex][
-                                otherAxis
-                                ] == cornerIndexToPosition[i][otherAxis] &&
-                                cornerIndexToPosition[selfAxisCornerIndex][
-                                lastAxis
-                                ] !== cornerIndexToPosition[i][lastAxis]
-                            )!;
-
-                          if (farOpposedCornerIndex === undefined) {
-                            throw new Error("tf2");
-                          }
-
-                          const farOpposedEdge =
-                            farOpposedCornerData.edges[
-                            cornerIndexToEdgeIndex[farOpposedCornerIndex]
-                            ];
-
-                          if (farOpposedEdge) {
-                            this.linkEdge(selfEdge, farOpposedEdge);
-                          }
-                        }
-                      });
-                  }
+                      }
+                    });
                 }
-              });
+              }
             });
-          }
+          });
         }
       }
     }
