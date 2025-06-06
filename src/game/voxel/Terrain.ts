@@ -4,15 +4,20 @@ import {
   Color3,
   Color4,
   KeyboardEventTypes,
+  LinesMesh,
   Matrix,
   Mesh,
   MeshBuilder,
   PhysicsAggregate,
+  PhysicsBody,
+  PhysicsMotionType,
+  PhysicsShapeMesh,
   PhysicsShapeType,
   StandardMaterial,
   TransformNode,
   Vector2,
   Vector3,
+  VertexBuffer,
   VertexData,
 } from "@babylonjs/core";
 
@@ -49,7 +54,10 @@ interface Point {
   position: Vector3;
   lines: Line[];
   dead: boolean;
+  voxels: Vector3[];
 }
+
+
 type Material = "gaz" | "solid";
 
 interface Block {
@@ -112,12 +120,13 @@ export class Terrain {
   transparentSphereMesh: Mesh;
   triangles: Triangle[];
   meshLines: [Point, Point][];
-  ownerLines: [Vector3, Vector3][];
   debugLines: [Vector3, Vector3][];
   gridRoot: TransformNode;
   rendered: TransformNode;
   editBounds: { min: Vector3, max: Vector3 } | null;
   terrainMesh: Mesh;
+  linesMesh: LinesMesh;
+  terrainBody: PhysicsBody;
 
   constructor(scene: MainScene) {
     this.scene = scene;
@@ -199,9 +208,12 @@ export class Terrain {
     console.log(`(${this.editBounds.min.x.toString()} -> ${this.editBounds.max.x.toString()}, ${this.editBounds.min.y.toString()} -> ${this.editBounds.max.y.toString()}, ${this.editBounds.min.z.toString()} -> ${this.editBounds.max.z.toString()})`)
 
     this.removePoints();
-    this.rendered.dispose();
-    this.rendered = new TransformNode("root2", this.scene);
-    this.rendered.parent = this.gridRoot;
+
+    if (debug) {
+      this.rendered.dispose();
+      this.rendered = new TransformNode("root2", this.scene);
+      this.rendered.parent = this.gridRoot;
+    }
     this.compute();
     this.render();
 
@@ -218,7 +230,6 @@ export class Terrain {
       }));
     this.triangles = [];
     this.meshLines = [];
-    this.ownerLines = [];
     this.debugLines = [];
   }
 
@@ -279,7 +290,7 @@ export class Terrain {
       }
     }
 
-    const point = { position: new Vector3(x, y, z), lines: [], dead: false };
+    const point: Point = { position: new Vector3(x, y, z), lines: [], voxels: [], dead: false };
 
     voxel.points.push(point);
 
@@ -397,12 +408,13 @@ export class Terrain {
     this.checkLinesForQuadDissolve(p4.lines);
   }
 
-  linkEdge(edge1: Point, edge2: Point) {
+  makeEdge(edge1: Point, edge2: Point) {
     const p1 = this.getPoint(
       edge1.position.x,
       edge1.position.y,
       edge1.position.z
     );
+
     const p2 = this.getPoint(
       edge2.position.x,
       edge2.position.y,
@@ -467,10 +479,12 @@ export class Terrain {
       for (let i = 0; i < 8; i++) {
         const cornerPos = cornerIndexToPosition[i];
 
+        const voxelPos = new Vector3(x + cornerPos.x, y + cornerPos.y, z + cornerPos.z);
+
         const corner = this.getVoxel(
-          x + cornerPos.x,
-          y + cornerPos.y,
-          z + cornerPos.z
+          voxelPos.x,
+          voxelPos.y,
+          voxelPos.z,
         );
 
         corner.edgesConfigs[cornerIndexToEdgeIndex[i]] = config;
@@ -499,6 +513,8 @@ export class Terrain {
           ) {
             //console.log(point.position);
           }
+
+          point.voxels.push(voxelPos);
 
           corner.edges[cornerIndexToEdgeIndex[i]] = point;
         }
@@ -572,6 +588,7 @@ export class Terrain {
     for (let x = min2.x; x < max2.x; x++) {
       for (let y = min2.y; y < max2.y; y++) {
         for (let z = min2.z; z < max2.z; z++) {
+          const blockData = this.getBlock(x, y, z);
           const cornerData = this.getVoxel(x, y, z);
 
           if (
@@ -586,6 +603,14 @@ export class Terrain {
 
           axisDirection.forEach((sign) => {
             axisNames.forEach((axis) => {
+              const opposedBlockData = this.getBlock(x + (axis === "x" ? sign : 0),
+                y + (axis === "y" ? sign : 0),
+                z + (axis === "z" ? sign : 0));
+
+              if (opposedBlockData.v === blockData.v) {
+                return;
+              }
+
               const selfAxisCornerIndexes = cornerIndexToPosition
                 .map((c, i) => (c[axis] === (sign === -1 ? 1 : 0) ? i : -1)) // -1 c'est 1 car  [0    1]X[0    1]
                 .filter((i) => i >= 0);
@@ -609,15 +634,6 @@ export class Terrain {
                   ];
 
                 if (selfEdge) {
-                  this.ownerLines.push([
-                    new Vector3(x, y, z),
-                    new Vector3(
-                      selfEdge.position.x,
-                      selfEdge.position.y,
-                      selfEdge.position.z
-                    ),
-                  ]);
-
                   axisNames
                     .filter((a) => axis !== a)
                     .map((otherAxis) => {
@@ -649,7 +665,7 @@ export class Terrain {
                         ];
 
                       if (otherEdge) {
-                        this.linkEdge(selfEdge, otherEdge);
+                        this.makeEdge(selfEdge, otherEdge);
                       }
 
                       const farOpposedCornerData = this.getVoxel(
@@ -701,7 +717,7 @@ export class Terrain {
                           ];
 
                         if (farOpposedEdge) {
-                          this.linkEdge(selfEdge, farOpposedEdge);
+                          this.makeEdge(selfEdge, farOpposedEdge);
                         }
                       }
                     });
@@ -781,8 +797,47 @@ export class Terrain {
     }
   }
 
-  drawMeshLines() {
+  drawOwnerLines() {
+    const lines: Vector3[][] = [];
+
+    for (let x = 0; x < this.size; x++) {
+      for (let y = 0; y < this.size; y++) {
+        for (let z = 0; z < this.size; z++) {
+          for (let i = 0; i < 8; i++) {
+            const cornerData = this.getVoxel(x, y, z);
+
+            for (const point of cornerData.points) {
+              for (const voxel of point.voxels) {
+                lines.push([new Vector3(voxel.x, voxel.y, voxel.z), new Vector3(point.position.x, point.position.y, point.position.z)])
+              }
+            }
+          }
+        }
+      }
+    }
+
     const customMesh = MeshBuilder.CreateLineSystem(
+      "lineSystem",
+      {
+        lines
+      },
+      this.scene
+    );
+
+    customMesh.parent = this.rendered;
+
+    customMesh.color = Color3.Gray();
+  }
+
+  drawMeshLines() {
+    if (this.linesMesh) {
+      this.rendered.removeChild(this.linesMesh);
+      this.scene.removeMesh(this.linesMesh);
+      this.linesMesh.dispose();
+      this.linesMesh = null;
+    }
+
+    this.linesMesh = MeshBuilder.CreateLineSystem(
       "lineSystem",
       {
         lines: this.meshLines.map((l) =>
@@ -792,52 +847,36 @@ export class Terrain {
       this.scene
     );
 
-    customMesh.parent = this.rendered;
-    customMesh.color = new Color3(0.2, 0.8, 1).scale(0.8);
+    this.linesMesh.parent = this.rendered;
+    this.linesMesh.color = new Color3(0.2, 0.8, 1).scale(0.8);
 
     {
-      const i2 = customMesh.createInstance("l");
+      const i2 = this.linesMesh.createInstance("l");
       i2.position.set(0.01, 0, 0);
       i2.parent = this.rendered;
 
-      const i3 = customMesh.createInstance("l");
+      const i3 = this.linesMesh.createInstance("l");
       i3.position.set(0, 0.01, 0);
       i3.parent = this.rendered;
 
-      const i4 = customMesh.createInstance("l");
+      const i4 = this.linesMesh.createInstance("l");
       i4.position.set(0, 0, 0.01);
       i4.parent = this.rendered;
     }
 
     {
-      const i2 = customMesh.createInstance("l");
+      const i2 = this.linesMesh.createInstance("l");
       i2.position.set(-0.01, 0, 0);
       i2.parent = this.rendered;
 
-      const i3 = customMesh.createInstance("l");
+      const i3 = this.linesMesh.createInstance("l");
       i3.position.set(0, -0.01, 0);
       i3.parent = this.rendered;
 
-      const i4 = customMesh.createInstance("l");
+      const i4 = this.linesMesh.createInstance("l");
       i4.position.set(0, 0, -0.01);
       i4.parent = this.rendered;
     }
-  }
-
-  drawOwnerLines() {
-    const customMesh = MeshBuilder.CreateLineSystem(
-      "lineSystem",
-      {
-        lines: this.ownerLines.map((l) =>
-          l.map((li) => new Vector3(li.x, li.y, li.z))
-        ),
-      },
-      this.scene
-    );
-
-    customMesh.parent = this.rendered;
-
-    customMesh.color = Color3.Gray();
   }
 
   drawDebugLines() {
@@ -857,12 +896,6 @@ export class Terrain {
   }
 
   draw() {
-    const customMesh = new Mesh("custom", this.scene);
-
-    customMesh.parent = this.rendered;
-
-    //customMesh.position.set(5, 5, 5);
-
     const positions: number[] = [];
     const indices: number[] = [];
 
@@ -876,30 +909,43 @@ export class Terrain {
     });
 
     const vertexData = new VertexData();
-
-    //Empty array to contain calculated values or normals added
-    // var normals = [];
-
-    // //Calculations of normals added
-    // VertexData.ComputeNormals(positions, indices, normals, {
-    // subDiv: [8, 8, 8]
-    // })
-
     vertexData.positions = positions;
     vertexData.indices = indices;
-    //vertexData.normals = normals;
 
-    vertexData.applyToMesh(customMesh);
+    if (!this.terrainMesh) {
+      this.terrainMesh = new Mesh("custom", this.scene, {});
 
-    const mat = new StandardMaterial("mat", this.scene);
-    mat.backFaceCulling = false;
-    mat.ambientColor = new Color3(0.01, 0.01, 0.01);
-    mat.disableLighting = true;
-    //mat.wireframe = true;
-    customMesh.material = mat;
+      this.terrainMesh.parent = this.rendered;
 
-    this.terrainMesh = customMesh;
+      //customMesh.position.set(5, 5, 5);
 
-    new PhysicsAggregate(this.terrainMesh, PhysicsShapeType.MESH, { mass: 0 }, this.scene);
+      vertexData.applyToMesh(this.terrainMesh, false);
+
+      const mat = new StandardMaterial("mat", this.scene);
+      mat.backFaceCulling = false;
+      mat.ambientColor = new Color3(0.01, 0.01, 0.01);
+      mat.disableLighting = true;
+      //mat.wireframe = true;
+      this.terrainMesh.material = mat;
+
+      const shape = new PhysicsShapeMesh(
+        this.terrainMesh,   // mesh from which to calculate the collisions
+        this.scene   // scene of the shape
+      );
+
+      this.terrainBody = new PhysicsBody(this.terrainMesh, PhysicsMotionType.STATIC, false, this.scene);
+
+      this.terrainBody.shape = shape;
+    } else {
+      vertexData.applyToMesh(this.terrainMesh, false);
+      const oldShape = this.terrainBody.shape;
+
+      this.terrainBody.shape = new PhysicsShapeMesh(
+        this.terrainMesh,   // mesh from which to calculate the collisions
+        this.scene   // scene of the shape
+      );
+
+      oldShape?.dispose();
+    }
   }
 }
