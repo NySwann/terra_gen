@@ -131,7 +131,7 @@ export class Terrain {
   constructor(scene: MainScene) {
     this.scene = scene;
 
-    this.size = 60;
+    this.size = 20;
     this.blocks = new Array(this.size * this.size * this.size)
       .fill(null)
       .map(() => ({
@@ -523,8 +523,11 @@ export class Terrain {
   }
 
   removePoints() {
-    const min = new Vector3(Math.max(this.editBounds?.min.x - 1, 0), Math.max(this.editBounds?.min.y - 1, 0), Math.max(this.editBounds?.min.z - 1, 0));
-    const max = new Vector3(Math.min(this.editBounds?.max.x + 2, this.size), Math.min(this.editBounds?.max.y + 2, this.size), Math.min(this.editBounds?.max.z + 2, this.size));
+    const min_d = 2;
+    const max_d = 3;
+
+    const min = new Vector3(Math.max(this.editBounds?.min.x - min_d, 0), Math.max(this.editBounds?.min.y - min_d, 0), Math.max(this.editBounds?.min.z - min_d, 0));
+    const max = new Vector3(Math.min(this.editBounds?.max.x + max_d, this.size), Math.min(this.editBounds?.max.y + max_d, this.size), Math.min(this.editBounds?.max.z + max_d, this.size));
 
     for (let x = min.x; x < max.x; x++) {
       for (let y = min.y; y < max.y; y++) {
@@ -571,8 +574,11 @@ export class Terrain {
   }
 
   compute() {
-    const min = new Vector3(Math.max(this.editBounds?.min.x - 2, 0), Math.max(this.editBounds?.min.y - 2, 0), Math.max(this.editBounds?.min.z - 2, 0));
-    const max = new Vector3(Math.min(this.editBounds?.max.x + 2, this.size - 1), Math.min(this.editBounds?.max.y + 2, this.size - 1), Math.min(this.editBounds?.max.z + 2, this.size - 1));
+    const min_d = 3;
+    const max_d = 3;
+
+    const min = new Vector3(Math.max(this.editBounds?.min.x - min_d, 0), Math.max(this.editBounds?.min.y - min_d, 0), Math.max(this.editBounds?.min.z - min_d, 0));
+    const max = new Vector3(Math.min(this.editBounds?.max.x + max_d, this.size - 1), Math.min(this.editBounds?.max.y + max_d, this.size - 1), Math.min(this.editBounds?.max.z + max_d, this.size - 1));
 
     for (let x = min.x; x < max.x; x++) {
       for (let y = min.y; y < max.y; y++) {
@@ -582,8 +588,11 @@ export class Terrain {
       }
     }
 
-    const min2 = new Vector3(Math.max(this.editBounds?.min.x - 4, 0), Math.max(this.editBounds?.min.y - 4, 0), Math.max(this.editBounds?.min.z - 4, 0));
-    const max2 = new Vector3(Math.min(this.editBounds?.max.x + 4, this.size - 1), Math.min(this.editBounds?.max.y + 4, this.size - 1), Math.min(this.editBounds?.max.z + 4, this.size - 1));
+    const min_d2 = 5;
+    const max_d2 = 5;
+
+    const min2 = new Vector3(Math.max(this.editBounds?.min.x - min_d2, 0), Math.max(this.editBounds?.min.y - min_d2, 0), Math.max(this.editBounds?.min.z - min_d2, 0));
+    const max2 = new Vector3(Math.min(this.editBounds?.max.x + max_d2, this.size - 1), Math.min(this.editBounds?.max.y + max_d2, this.size - 1), Math.min(this.editBounds?.max.z + max_d2, this.size - 1));
 
     for (let x = min2.x; x < max2.x; x++) {
       for (let y = min2.y; y < max2.y; y++) {

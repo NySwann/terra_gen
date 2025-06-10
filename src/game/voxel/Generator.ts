@@ -33,7 +33,7 @@ export class Generator {
     for (let x = 0; x < terrain.size; x++) {
       for (let y = 0; y < terrain.size; y++) {
         for (let z = 0; z < terrain.size; z++) {
-          const sample = this.samplePlanet(x, y, z, terrain.size);
+          const sample = this.sampleGround(x, y, z, terrain.size);
           //if (z > 40)
           terrain.setBlockMaterial(x, y, z, sample ? "solid" : "gaz");
         }
@@ -44,7 +44,11 @@ export class Generator {
   sampleGround(x: number, y: number, z: number, size: number) {
     let v = false;
 
-    v ||= y < 4;
+    v ||= y > 8 && y < 14;
+
+    v ||= y > 4 && y < 8;
+
+    v ||= y > 2 && y < 4;
 
     v &&=
       x > 2 && x < size - 2 && y > 2 && y < size - 2 && z > 2 && z < size - 2;
