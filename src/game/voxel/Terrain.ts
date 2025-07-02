@@ -131,7 +131,7 @@ export class Terrain {
   constructor(scene: MainScene) {
     this.scene = scene;
 
-    this.size = 20;
+    this.size = 60;
     this.blocks = new Array(this.size * this.size * this.size)
       .fill(null)
       .map(() => ({
@@ -170,6 +170,7 @@ export class Terrain {
           switch (kbInfo.event.key) {
             case "d":
               debug = !debug;
+              this.terrainMesh = null;
               this.rendered.dispose();
               this.rendered = new TransformNode("root2", this.scene);
               this.rendered.parent = this.gridRoot;
@@ -393,12 +394,12 @@ export class Terrain {
       a2.x * b2.y - a2.y * b2.x
     );
 
-    const diff = Vector3.Dot(
+    const diff = Math.abs(Vector3.Dot(
       new Vector3(n1.x, n1.y, n1.z).normalize(),
       new Vector3(n2.x, n2.y, n2.z).normalize()
-    );
+    ));
 
-    if (diff < 0.9) {
+    if (diff <= 0.6) {
       this.meshLines.push([triangles[0].points[0], triangles[0].points[2]]);
     }
 
