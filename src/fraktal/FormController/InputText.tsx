@@ -2,14 +2,13 @@ import { TextInput } from '@mantine/core';
 import { type ChangeEventHandler, useCallback } from 'react';
 import type { Node } from '../lokta/tree';
 import { useNodeValue } from './useNodeValue';
-
-interface InputTextProps<NH extends Node<string>> {
-  nodeHandle: NH;
+interface InputTextProps {
+  nodeHandle: Node<string>;
 }
 
-const FormInputText = <NH extends Node<string>>({
+const FormInputText = ({
   nodeHandle
-}: InputTextProps<NH>) => {
+}: InputTextProps) => {
   const value = useNodeValue({
     nodeHandle,
     child: false

@@ -1,20 +1,20 @@
 
 
 import { useCallback, useEffect, useState } from 'react';
-import type { Node, Node_NodeValue } from '../lokta/tree';
+import type { GetOnlyNode, NodeValue } from '../lokta/tree';
 
-interface UseNodeValueProps<NH extends Node> {
-  nodeHandle: NH,
+interface UseNodeValueProps<NV extends NodeValue> {
+  nodeHandle: GetOnlyNode<NV>,
   child: boolean;
 }
 
-export const useNodeValue = <NH extends Node>({
+export const useNodeValue = <NV extends NodeValue>({
   nodeHandle,
   child
-}: UseNodeValueProps<NH>): Node_NodeValue<NH> => {
+}: UseNodeValueProps<NV>): NV => {
   const getValue = useCallback(() => nodeHandle.get_value(), [nodeHandle]);
 
-  const [value, setValue] = useState<Node_NodeValue<NH>>(getValue());
+  const [value, setValue] = useState<NV>(getValue());
 
   useEffect(() => {
     setValue(getValue());

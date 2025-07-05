@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { make_tree, type TreeValue, type Tree } from './tree';
-import type { StringPath } from './types';
+import type { GetType, Path, SetType } from './types';
 
 interface User {
     name: string;
@@ -15,12 +15,29 @@ interface Rating {
 interface Article {
     name: string;
     price: number;
+    meta: unknown;
+    meta2: any;
     ratings: Rating[];
 }
 
 interface FormValue1 {
     articles: Article[];
 }
+
+type all_path_that_accept_setting_a_string = Path<FormValue1, SetType<string>>;
+
+
+type all_path_that_accept_setting_a_string2 = Path<string, SetType<string>>;
+
+
+
+
+
+
+
+type all_path_that_accept_getting_a_string = Path<FormValue1, GetType<string>>;
+
+type all_path_that_accept_getting_a_string2 = Path<string, GetType<string>>;
 
 describe('test_tree', () => {
     test('value updating', () => {
@@ -73,7 +90,7 @@ describe('test_tree', () => {
             type: "child" | "own", listener_string_path: string, target_string_path: string, old_value: unknown, new_value: unknown
         }[] = [];
 
-        const make_events_listener = <TD extends TreeValue, NP extends StringPath<TD>>(tree: Tree<TD>, path: NP, listen_to_child: boolean) => {
+        const make_events_listener = <TD extends TreeValue, NP extends Path<TD>>(tree: Tree<TD>, path: NP, listen_to_child: boolean) => {
             const node = tree.get_node(path);
 
             const known_value: Record<string, any> = {};

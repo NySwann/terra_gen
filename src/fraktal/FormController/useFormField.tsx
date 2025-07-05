@@ -1,15 +1,15 @@
 import { useMemo } from 'react';
 
 import { TreeValue } from '../lokta/tree';
-import { StringPath, StringPath_InValue } from '../lokta/types';
+import { Path, Path_InValue } from '../lokta/types';
 import { FormHandle } from './useForm';
 
-interface UseFormFieldProps<FC extends TreeValue, SP extends StringPath<FC>> {
+interface UseFormFieldProps<FC extends TreeValue, SP extends Path<FC>> {
   formHandle: FormHandle<FC>;
   path: SP
 }
 
-export const useFormField = <FC extends TreeValue, SP extends StringPath<FC>>({
+export const useFormField = <FC extends TreeValue, SP extends Path<FC>>({
   formHandle,
   path
 }: UseFormFieldProps<FC, SP>) => {
@@ -18,7 +18,7 @@ export const useFormField = <FC extends TreeValue, SP extends StringPath<FC>>({
 
     return {
       getValue: () => node.get_value(),
-      setValue: (value: StringPath_InValue<SP>) => { node.set_value(value); }
+      setValue: (value: Path_InValue<SP>) => { node.set_value(value); }
     }
   }, [formHandle._internal.tree, path]
   );

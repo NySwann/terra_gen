@@ -4803,6 +4803,7 @@ __metadata:
     vite: "npm:^6.3.5"
     vite-plugin-html: "npm:^3.2.2"
     vitest: "npm:^3.2.4"
+    zod: "npm:^3.25.67"
   languageName: unknown
   linkType: soft
 
@@ -4901,5 +4902,12 @@ __metadata:
   version: 3.25.48
   resolution: "zod@npm:3.25.48"
   checksum: 10c0/bb1a537b27b62e6e7a37f909e9ff029c6ddac89fd6bba24b8e92b2002d5e9aaa90f74b30da1186a1f6ea5f1a0e216b77fad49301a91998d32730fc1b65719dc3
+  languageName: node
+  linkType: hard
+
+"zod@npm:^3.25.67":
+  version: 3.25.67
+  resolution: "zod@npm:3.25.67"
+  checksum: 10c0/80a0cab3033272c4ab9312198081f0c4ea88e9673c059aa36dc32024906363729db54bdb78f3dc9d5529bd1601f74974d5a56c0a23e40c6f04a9270c9ff22336
   languageName: node
   linkType: hard

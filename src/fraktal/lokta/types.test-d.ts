@@ -1,7 +1,7 @@
 import { test, expectTypeOf } from 'vitest';
 
 import type { Node } from "./tree";
-import type { StringPath, StringPathValue, MergeStringPath, SubStringPath } from "./types";
+import type { Path, PathValue, MergePath, SubPath } from "./types";
 
 interface User {
     name: string;
@@ -23,8 +23,8 @@ interface FormValue1 {
     articles: Article[];
 }
 
-type p = MergeStringPath<FormValue1, ".articles", ".0">;
-type f = StringPathValue<FormValue1, MergeStringPath<FormValue1, ".articles", ".0">>;
+type p = MergePath<FormValue1, ".articles", ".0">;
+type f = PathValue<FormValue1, MergePath<FormValue1, ".articles", ".0">>;
 
 interface _t {
     user: {
@@ -49,19 +49,19 @@ interface _t {
     z: any;
 }
 
-type _a2 = StringPath<_t>;
-type _c2 = StringPathValue<_t, ".user">
-type _d2 = StringPathValue<_t, ".user.lol">
-type _e2 = StringPathValue<_t, ".user.lol.b">
-type _g2 = StringPathValue<_t, ".user.lol.b.1">
-type _h2 = StringPathValue<_t, ".user.lol.b.0">
-type _f2 = MergeStringPath<_t, ".user" | ".user2", ".lol" | ".y">;
-type _k2 = StringPathValue<_t, ".user.lol.a.0">
-type _l2 = StringPathValue<_t, ".user.lol.a.0.x">
-type _m2 = StringPathValue<_t, ".user.lol.a.0.x.z" | ".user.lol.a.0">
-type _z2 = SubStringPath<_t, ".user.lol.a.0">
-type _x2 = SubStringPath<_t, ".user.lol.a">
-type _w2 = SubStringPath<_t, ".user.lol.b">
+type _a2 = Path<_t>;
+type _c2 = PathValue<_t, ".user">
+type _d2 = PathValue<_t, ".user.lol">
+type _e2 = PathValue<_t, ".user.lol.b">
+type _g2 = PathValue<_t, ".user.lol.b.1">
+type _h2 = PathValue<_t, ".user.lol.b.0">
+type _f2 = MergePath<_t, ".user" | ".user2", ".lol" | ".y">;
+type _k2 = PathValue<_t, ".user.lol.a.0">
+type _l2 = PathValue<_t, ".user.lol.a.0.x">
+type _m2 = PathValue<_t, ".user.lol.a.0.x.z" | ".user.lol.a.0">
+type _z2 = SubPath<_t, ".user.lol.a.0">
+type _x2 = SubPath<_t, ".user.lol.a">
+type _w2 = SubPath<_t, ".user.lol.b">
 
 export type JsonPrimative1 = string | number | boolean | null;
 export type JsonArray1 = Json1[];
@@ -69,20 +69,20 @@ export interface JsonObject1 { [key: string]: Json1 }
 export type JsonComposite1 = JsonArray1 | JsonObject1;
 export type Json1 = JsonPrimative1 | JsonComposite1;
 
-// type _arrr = Path<Json1>;
-// type _arrr2 = StringPath<Json1>;
+type _arrr = Path<Json1>;
+// type _arrr2 = Path<Json1>;
 
-// type _zz2 = StringPathByExactValue<_t, number>;
-// type _zzz2 = StringPathValue<_t, _zz2>;
+// type _zz2 = PathByType<_t, number>;
+// type _zzz2 = PathValue<_t, _zz2>;
 
-// type _a22 = AddValues<_t, StringPath<_t>>;
-// type _a222 = FilterByValue<_t, StringPath<_t>, AddValues<_t, StringPath<_t>>, number>;
+// type _a22 = AddValues<_t, Path<_t>>;
+// type _a222 = FilterByValue<_t, Path<_t>, AddValues<_t, Path<_t>>, number>;
 
-// type _a333 = StringPath<_t, 2, number>;
-// type _a3331 = StringPath<_t>;
-// type _a3332 = StringPath<_t, never, unknown>;
-// type _a3333 = StringPath<_t, string, string | number>;
-// type _a3334 = StringPath<_t, string, string>;
+// type _a333 = Path<_t, 2, number>;
+// type _a3331 = Path<_t>;
+// type _a3332 = Path<_t, never, unknown>;
+// type _a3333 = Path<_t, string, string | number>;
+// type _a3334 = Path<_t, string, string>;
 
 // const t: _t = 3 as unknown as _t;
 
@@ -91,8 +91,8 @@ export type Json1 = JsonPrimative1 | JsonComposite1;
 
 // const c = _faaa(t, ".user.lol.b.0");
 
-// function _get_v<T, P extends StringPathByExactValue<T, number>>(_t: T, _p: P): StringPathValue<T, P> {
-//     const a: StringPathValue<T, StringPathByExactValue<T, number>> = "mdr";
+// function _get_v<T, P extends PathByType<T, number>>(_t: T, _p: P): PathValue<T, P> {
+//     const a: PathValue<T, PathByType<T, number>> = "mdr";
 
 //     return a;
 // }
@@ -102,8 +102,8 @@ export type Json1 = JsonPrimative1 | JsonComposite1;
 // type _ax3 = Extends<TypeRange<1 | 2, 1 | 2>, TypeRange<1 | 2, number>>;
 // type _ax4 = Extends<TypeRange<1, 1>, TypeRange<1 | 2, number>>;
 
-// type _ax4 = TypeRange_LB<TypeRange<1 | 2, number>>;
-// type _ax4 = TypeRange_UB<TypeRange<1 | 2, number>>;
+// type _ax4 = TypeRange_Set<TypeRange<1 | 2, number>>;
+// type _ax4 = TypeRange_Get<TypeRange<1 | 2, number>>;
 
 /*
 
@@ -113,8 +113,8 @@ type z2 = Extends<FormContent, any>;
 type z2 = Extends<never, any>;
 type z2 = Extends<any, never>;
 
-type G1<T> = InBounds<T, string, string> extends true ? "" : never;
-type G2<T> = InBounds<T, never, any> extends true ? "" : never;
+type G1<T> = InRange<T, string, string> extends true ? "" : never;
+type G2<T> = InRange<T, never, any> extends true ? "" : never;
 
 const f = <FC extends FormContent & any>() => {
     let a: G1<FC>;
@@ -133,12 +133,12 @@ type f = IsAtomic<number[]>;
 type f = IsAtomic<never[]>;
 type f = IsAtomic<any[]>;
 
-type f = InBounds<any, never, any>;
-type f = InBounds<any, any, any>;
-type f = InBounds<any, never, never>;
-type f = InBounds<never, never, any>;
-type f = InBounds<never, any, any>;
-type f = InBounds<{}, never, unknown>;
+type f = InRange<any, never, any>;
+type f = InRange<any, any, any>;
+type f = InRange<any, never, never>;
+type f = InRange<never, never, any>;
+type f = InRange<never, any, any>;
+type f = InRange<{}, never, unknown>;
 
 type f = IsAtomic<{
     name: string;
@@ -169,18 +169,20 @@ const _c: Node<"1"> = _b;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _d: Node<"1"> = _a;
 
-test('my types work properly', () => {
-    expectTypeOf<SubStringPath<_t, ".user.lol.b">>().toEqualTypeOf<".0" | ".1">();
+type g = SubPath<_t, ".user.lol.b">;
 
-    expectTypeOf<StringPathValue<_t, ".user.lol.a.0.x.z" | ".user.lol.a.0">>().toEqualTypeOf<2 | {
+test('my types work properly', () => {
+    expectTypeOf<SubPath<_t, ".user.lol.b">>().toEqualTypeOf<"" | ".0" | ".1">();
+
+    expectTypeOf<PathValue<_t, ".user.lol.a.0.x.z" | ".user.lol.a.0">>().toEqualTypeOf<2 | {
         x: {
             z: 2;
         };
     }>()
 
-    expectTypeOf<MergeStringPath<_t, ".user" | ".user2", ".lol" | ".y">>().toEqualTypeOf<".user.y" | ".user.lol" | ".user2.lol">();
+    expectTypeOf<MergePath<_t, ".user" | ".user2", ".lol" | ".y">>().toEqualTypeOf<".user.y" | ".user.lol" | ".user2.lol">();
 
-    expectTypeOf<MergeStringPath<_t, ".user" | ".user2", ".lol" | ".y">>().toEqualTypeOf<".user.y" | ".user.lol" | ".user2.lol">();
+    expectTypeOf<MergePath<_t, ".user" | ".user2", ".lol" | ".y">>().toEqualTypeOf<".user.y" | ".user.lol" | ".user2.lol">();
 
     expectTypeOf<Node<"1">>().toEqualTypeOf<Node<"1">>();
 
