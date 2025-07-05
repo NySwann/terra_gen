@@ -1,5 +1,5 @@
-import { useCallback, useRef} from 'react'
-import './App.css'
+import { useCallback, useRef } from 'react'
+
 import "@mantine/core/styles.css";
 import { AppShell, Flex, MantineProvider, Text } from '@mantine/core';
 import { theme } from '../theme';
@@ -10,7 +10,7 @@ import { rendererStore } from '@/stores/renderer';
 
 function App() {
   const renderer = useStoreValue(rendererStore);
-  const rendererRef = useRef<{div: HTMLDivElement, canvas: HTMLCanvasElement} | null>(null);
+  const rendererRef = useRef<{ div: HTMLDivElement, canvas: HTMLCanvasElement } | null>(null);
 
   const refCallback = useCallback((node: HTMLDivElement | null) => {
     if (node !== null) {
@@ -24,7 +24,7 @@ function App() {
 
       renderer.attach(canvasElement);
 
-      rendererRef.current = {canvas: canvasElement, div: node};
+      rendererRef.current = { canvas: canvasElement, div: node };
     }
     else if (rendererRef.current) {
       console.log("destroyed");
@@ -52,17 +52,17 @@ function App() {
       footer={{ height: "4%" }}
       padding="md"
     >
-      <AppShell.Header style={{display: "flex", alignItems: "center", justifyContent: "center"}}>
+      <AppShell.Header style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Text>Trixel</Text>
       </AppShell.Header>
-      <Navbar/>
-      <AppShell.Main style={{display: "flex", alignItems: "center", justifyContent: "center"}}><Flex ref={refCallback}/></AppShell.Main>
-      <Aside/>
-      <AppShell.Footer style={{display: "flex", alignItems: "center", justifyContent: "center"}}>
+      <Navbar />
+      <AppShell.Main style={{ display: "flex", alignItems: "center", justifyContent: "stretch" }}><Flex ref={refCallback} /></AppShell.Main>
+      <Aside />
+      <AppShell.Footer style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Text id="display-fps">Zouin</Text>
       </AppShell.Footer>
     </AppShell>
-    </MantineProvider>
+  </MantineProvider>
 }
 
 export default App

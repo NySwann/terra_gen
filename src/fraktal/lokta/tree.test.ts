@@ -26,14 +26,7 @@ interface FormValue1 {
 
 type all_path_that_accept_setting_a_string = Path<FormValue1, SetType<string>>;
 
-
 type all_path_that_accept_setting_a_string2 = Path<string, SetType<string>>;
-
-
-
-
-
-
 
 type all_path_that_accept_getting_a_string = Path<FormValue1, GetType<string>>;
 
@@ -81,6 +74,8 @@ describe('test_tree', () => {
         }
 
         const tree = make_tree<FormValue1>(original_value);
+
+        const root = tree.get_node("");
 
         const node = tree.get_node(".articles.1");
 
@@ -135,15 +130,15 @@ describe('test_tree', () => {
 
         expect(tree._internal.tree.nodes[".articles"].childs.map(c => c.string_path)).toEqual([".articles.0", ".articles.1"]);
 
-        expect(tree.get_value("")).toBe(original_value);
-        expect(tree.get_value(".articles")).toBe(original_value.articles);
-        expect(tree.get_value(".articles.0")).toBe(original_value.articles[0]);
-        expect(tree.get_value(".articles.0.name")).toBe(original_value.articles[0].name);
+        expect(root.get_node("").get_value()).toBe(original_value);
+        expect(root.get_node(".articles").get_value()).toBe(original_value.articles);
+        expect(root.get_node(".articles.0").get_value()).toBe(original_value.articles[0]);
+        expect(root.get_node(".articles.0.name").get_value()).toBe(original_value.articles[0].name);
 
-        tree.set_value(".articles.0.name", 'Pika Plush');
+        root.get_node(".articles.0.name").set_value('Pika Plush');
 
-        expect(tree.get_value(".articles.0")).toBe(original_value.articles[0]);
-        expect(tree.get_value(".articles.0.name")).toBe("Pika Plush");
+        expect(root.get_node(".articles.0").get_value()).toBe(original_value.articles[0]);
+        expect(root.get_node(".articles.0.name").get_value()).toBe("Pika Plush");
 
 
         const a = tree.get_node(".articles");
@@ -213,7 +208,7 @@ describe('test_tree', () => {
 
         tree.get_node(".articles.0").rem_listener(l2);
 
-        tree.set_value(".articles.0.name", 'Pika');
+        root.get_node(".articles.0.name").set_value('Pika');
 
         expect(events.length).toBe(3);
 
@@ -245,7 +240,7 @@ describe('test_tree', () => {
 
         const l21 = make_events_listener(tree, ".articles.0", false);
 
-        tree.set_value(".articles.0.name", 'Pi')
+        root.get_node(".articles.0.name").set_value('Pi');
 
         expect(events.length).toBe(3);
 
@@ -275,17 +270,19 @@ describe('test_tree', () => {
 
         events = [];
 
-        tree.set_value(".articles.0", {
+        root.get_node(".articles.0").set_value({
             name: "Bulbasaur Plush",
             price: 12,
+            meta: "d",
+            meta2: "d",
             ratings: [{
                 content: "Cringe",
                 value: 4,
                 user: {
                     name: "Oscar"
                 }
-            },]
-        })
+            }]
+        });
 
         expect(events.length).toBe(3);
 
@@ -314,6 +311,8 @@ describe('test_tree', () => {
             new_value: {
                 name: "Bulbasaur Plush",
                 price: 12,
+                meta: "d",
+                meta2: "d",
                 ratings: [{
                     content: "Cringe",
                     value: 4,
@@ -349,6 +348,8 @@ describe('test_tree', () => {
             new_value: {
                 name: "Bulbasaur Plush",
                 price: 12,
+                meta: "d",
+                meta2: "d",
                 ratings: [{
                     content: "Cringe",
                     value: 4,
@@ -384,6 +385,8 @@ describe('test_tree', () => {
             new_value: {
                 name: "Bulbasaur Plush",
                 price: 12,
+                meta: "d",
+                meta2: "d",
                 ratings: [{
                     content: "Cringe",
                     value: 4,

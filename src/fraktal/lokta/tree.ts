@@ -1,4 +1,4 @@
-import type { ExactType, MergePath, Path, PathByType, PathValue, SubPath, TypeRange, TypeRange_Set, TypeRange_Get, IsNever } from "./types";
+import type { Path, PathValue } from "./types";
 
 export type TreeValue = unknown;
 export type NodeValue = unknown;
@@ -92,50 +92,50 @@ const set_at_string_path = <R, P extends Path<R>>(
 };
 
 
-interface NodeListenerEvents<TD extends TreeValue, NP extends Path<TD> = Path<TD>> {
-    on_events?: (events: TreeEvent<TD>[]) => void;
+interface NodeListenerEvents {
+    on_events?: (events: NodeEvent[]) => void;
 }
 
-interface NodeListener<TD extends TreeValue, NP extends Path<TD> = Path<TD>> {
+interface NodeListener {
     listen_to_child: boolean;
     last_acknowledged_event: number;
-    events: NodeListenerEvents<TD, NP>;
+    events: NodeListenerEvents;
 }
 
-export interface NodeInternal<TD extends TreeValue, NP extends Path<TD> = Path<TD>> {
-    tree: TreeInternal<TD>;
-    string_path: NP;
+export interface NodeInternal {
+    tree: TreeInternal;
+    string_path: string;
     array_path: string[];
-    parent: NodeInternal<TD> | null;
-    childs: NodeInternal<TD>[];
-    childs_with_events: NodeInternal<TD>[];
-    listeners: NodeListener<TD, NP>[];
+    parent: NodeInternal | null;
+    childs: NodeInternal[];
+    childs_with_events: NodeInternal[];
+    listeners: NodeListener[];
     events: {
-        childs: TreeEvent<TD>[],
-        exact: TreeEvent<TD>[],
+        childs: NodeEvent[],
+        exact: NodeEvent[],
     }
     listen_to_child: boolean;
     last_acknowledged_event: number;
 }
 
-interface TreeEvent<TD extends TreeValue> {
-    string_path: Path<TD>;
+interface NodeEvent {
+    string_path: string;
     array_path: string[];
     old_value: unknown;
     new_value: unknown;
     ack: number;
 }
 
-interface TreeInternal<TD extends TreeValue> {
-    root: NodeInternal<TD, "">
-    value: TD,
-    nodes: Record<string, NodeInternal<TD>>;
+interface TreeInternal {
+    root: NodeInternal
+    value: unknown,
+    nodes: Record<string, NodeInternal | undefined>;
     last_event: number;
-    history: TreeEvent<TD>[];
+    history: NodeEvent[];
     fire_in_progress: boolean;
 }
 
-const _find_parent_node = <TD extends TreeValue, NP extends Path<TD>>(tree: TreeInternal<TD>, string_path: NP): NodeInternal<TD> => {
+const _find_parent_node = (tree: TreeInternal, string_path: string): NodeInternal => {
     let parent_node = undefined;
     let x = string_path.length - 1;
 
@@ -151,9 +151,7 @@ const _find_parent_node = <TD extends TreeValue, NP extends Path<TD>>(tree: Tree
         x--;
     }
 
-    if (!parent_node) {
-        parent_node = tree.root;
-    }
+    parent_node ??= tree.root;
 
     return parent_node;
 }
@@ -180,15 +178,15 @@ const _classify_relative = (array_path: string[], other_array_path: string[]) =>
     return "exact";
 }
 
-interface RelativeNodes<TD extends TreeValue> {
-    exact: NodeInternal<TD>[];
-    parents: NodeInternal<TD>[];
-    childs: NodeInternal<TD>[];
-    unrelated: NodeInternal<TD>[];
+interface RelativeNodes {
+    exact: NodeInternal[];
+    parents: NodeInternal[];
+    childs: NodeInternal[];
+    unrelated: NodeInternal[];
 }
 
-const _classify_relatives = <TD extends TreeValue>(array_path: string[], nodes: NodeInternal<TD>[]): RelativeNodes<TD> => {
-    const relatives: RelativeNodes<TD> = {
+const _classify_relatives = (array_path: string[], nodes: NodeInternal[]): RelativeNodes => {
+    const relatives: RelativeNodes = {
         parents: [],
         childs: [],
         unrelated: [],
@@ -204,17 +202,17 @@ const _classify_relatives = <TD extends TreeValue>(array_path: string[], nodes: 
             relatives.parents.push(node);
         } else if (classification === "unrelated") {
             relatives.unrelated.push(node);
-        } else if (classification === "exact") {
-            relatives.exact.push(node);
         } else {
-            throw new Error("fuck");
+            relatives.exact.push(node);
         }
     }
 
     return relatives;
 }
 
-const _link_node = <TD extends TreeValue>(tree: TreeInternal<TD>, node: NodeInternal<TD>) => {
+const _link_node = (node: NodeInternal) => {
+    const tree = node.tree;
+
     const parent = _find_parent_node(tree, node.string_path);
     const relatives = _classify_relatives(node.array_path, parent.childs);
 
@@ -232,7 +230,7 @@ const _link_node = <TD extends TreeValue>(tree: TreeInternal<TD>, node: NodeInte
     tree.nodes[node.string_path] = node;
 }
 
-const _unlink_node_from_events = <TD extends TreeValue>(tree: TreeInternal<TD>, node: NodeInternal<TD>) => {
+const _unlink_node_from_events = (node: NodeInternal) => {
     if (node.string_path === "") {
         throw new Error("");
     }
@@ -261,15 +259,18 @@ const _unlink_node_from_events = <TD extends TreeValue>(tree: TreeInternal<TD>, 
     }
 }
 
-const _unlink_node = <TD extends TreeValue>(tree: TreeInternal<TD>, node: NodeInternal<TD>) => {
+const _unlink_node = (node: NodeInternal) => {
+    const tree = node.tree;
+
     if (node.string_path === "") {
         throw new Error("");
     }
 
     console.log("unlink node", node.string_path);
 
-    _unlink_node_from_events(tree, node);
+    _unlink_node_from_events(node);
 
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete tree.nodes[node.string_path];
 
     node.parent?.childs.splice(node.parent.childs.indexOf(node), 1);
@@ -277,8 +278,8 @@ const _unlink_node = <TD extends TreeValue>(tree: TreeInternal<TD>, node: NodeIn
     node.parent?.childs.forEach(c => c.parent = node.parent);
 }
 
-const _add_listener = <TD extends TreeValue, NP extends Path<TD>>(tree: TreeInternal<TD>, string_path: NP, listen_to_child: boolean, events: NodeListenerEvents<TD, NP>) => {
-    let node = tree.nodes[string_path] as NodeInternal<TD, NP>
+const _add_listener = (tree: TreeInternal, string_path: string, listen_to_child: boolean, events: NodeListenerEvents) => {
+    let node = tree.nodes[string_path];
 
     if (!node) {
         node = {
@@ -297,10 +298,10 @@ const _add_listener = <TD extends TreeValue, NP extends Path<TD>>(tree: TreeInte
             }
         }
 
-        _link_node(tree, node);
+        _link_node(node);
     }
 
-    const listener: NodeListener<TD, NP> = {
+    const listener: NodeListener = {
         listen_to_child,
         last_acknowledged_event: node.last_acknowledged_event,
         events
@@ -313,8 +314,8 @@ const _add_listener = <TD extends TreeValue, NP extends Path<TD>>(tree: TreeInte
     return listener;
 }
 
-const _rem_listener = <TD extends TreeValue, NP extends Path<TD>>(tree: TreeInternal<TD>, string_path: NP, listener: NodeListener<TD, NP>) => {
-    const node = tree.nodes[string_path] as NodeInternal<TD, NP>
+const _rem_listener = (tree: TreeInternal, string_path: string, listener: NodeListener) => {
+    const node = tree.nodes[string_path]
 
     if (!node) {
         throw new Error("Node not existing");
@@ -328,12 +329,12 @@ const _rem_listener = <TD extends TreeValue, NP extends Path<TD>>(tree: TreeInte
     node.listen_to_child = node.listeners.some(l => l.listen_to_child);
 
     if (!node.listeners.length && node.string_path !== "") {
-        _unlink_node(tree, node);
+        _unlink_node(node);
     }
 }
 
-const _make_tree_internal = <TD extends TreeValue>(value: TD): TreeInternal<TD> => {
-    const tree: TreeInternal<TD> = {
+const _make_tree_internal = (value: unknown): TreeInternal => {
+    const tree: TreeInternal = {
         root: null,
         value,
         nodes: {},
@@ -342,7 +343,7 @@ const _make_tree_internal = <TD extends TreeValue>(value: TD): TreeInternal<TD> 
         last_event: -1,
     }
 
-    const root: NodeInternal<TD, ""> = {
+    const root: NodeInternal = {
         listeners: [],
         string_path: "",
         array_path: [""],
@@ -364,15 +365,16 @@ const _make_tree_internal = <TD extends TreeValue>(value: TD): TreeInternal<TD> 
     return tree;
 }
 
-const _fire_events = <TD extends TreeValue>(tree: TreeInternal<TD>) => {
+const _fire_events = (tree: TreeInternal) => {
     if (tree.fire_in_progress) {
         throw new Error("fuck");
     }
 
     tree.fire_in_progress = true;
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     process_events: while (true) {
-        let node_with_events: NodeInternal<TD> = tree.root;
+        let node_with_events: NodeInternal = tree.root;
 
         while (!node_with_events.events.childs.length && !node_with_events.events.exact.length) {
             if (!node_with_events.childs_with_events.length) {
@@ -411,7 +413,7 @@ const _fire_events = <TD extends TreeValue>(tree: TreeInternal<TD>) => {
         // all listener processed, try to update parents ack
 
         if (!relatives.childs.length) {
-            let current: NodeInternal<TD> | null = cursor;
+            let current: NodeInternal | null = cursor;
 
             while (current != null) {
                 const max = Math.max(...current.listeners.map(l => l.last_acknowledged_event));
@@ -428,7 +430,7 @@ const _fire_events = <TD extends TreeValue>(tree: TreeInternal<TD>) => {
         // split worker
 
         if (cursor.string_path !== "") {
-            _unlink_node_from_events(tree, cursor);
+            _unlink_node_from_events(cursor);
         }
 
         const childs_events = [...cursor.events.childs];
@@ -444,9 +446,9 @@ const _fire_events = <TD extends TreeValue>(tree: TreeInternal<TD>) => {
     tree.fire_in_progress = false;
 }
 
-const _insert_event = <TD extends TreeValue>(tree: TreeInternal<TD>, event: TreeEvent<TD>, max_insertion_point?: NodeInternal<TD>): void => {
-    let current: NodeInternal<TD> | null = tree.nodes[event.string_path] ?? _find_parent_node(tree, event.string_path);
-    let insertion_point: NodeInternal<TD> | null = current;
+const _insert_event = (tree: TreeInternal, event: NodeEvent, max_insertion_point?: NodeInternal): void => {
+    let current: NodeInternal | null = tree.nodes[event.string_path] ?? _find_parent_node(tree, event.string_path);
+    let insertion_point: NodeInternal | null = current;
 
     if (insertion_point === max_insertion_point) {
         throw new Error();
@@ -460,7 +462,8 @@ const _insert_event = <TD extends TreeValue>(tree: TreeInternal<TD>, event: Tree
         current = current.parent;
     }
 
-    if (insertion_point != null) {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (insertion_point !== null) {
         const classification = _classify_relative(insertion_point.array_path, event.array_path);
 
         if (classification === "exact") {
@@ -509,59 +512,57 @@ const _insert_event = <TD extends TreeValue>(tree: TreeInternal<TD>, event: Tree
     }
 }
 
-const _set_node_value = <TD extends TreeValue, NP extends Path<TD>>(tree: TreeInternal<TD>, string_path: NP, new_value: PathValue<TD, NP>): void => {
+const _set_node_value = (tree: TreeInternal, string_path: string, new_value: unknown): void => {
     const old_value = get_at_string_path(tree.value, string_path);
 
     if (value_equal(new_value, old_value)) {
         throw new Error("Same value");
     }
 
-    tree.value = set_at_string_path(tree.value, string_path, new_value) as TD;
+    tree.value = set_at_string_path(tree.value, string_path, new_value);
 
     tree.last_event++;
 
-    const event: TreeEvent<TD> = { string_path, array_path: string_path.split("."), old_value, new_value, ack: tree.last_event };
+    const event: NodeEvent = { string_path, array_path: string_path.split("."), old_value, new_value, ack: tree.last_event };
 
     _insert_event(tree, event);
 }
 
-const _get_node_value = <TD extends TreeValue, NP extends Path<TD>>(tree: TreeInternal<TD>, string_path: NP): PathValue<TD, NP> => {
+const _get_node_value = (tree: TreeInternal, string_path: string): unknown => {
     const value = get_at_string_path(tree.value, string_path);
 
     return value;
 }
 
-type f = SubPath<TreeValue, Path<TreeValue, ExactType<NodeValue>>>;
-
-export interface Node<NV extends NodeValue = NodeValue, TD extends TreeValue = TreeValue, NP extends Path<TD, ExactType<NV>> = Path<TD, ExactType<NV>>> {
-    // _internal: {
-    //     tree: TreeInternal<TD>;
-    // }
-    string_path: NP;
+export interface Node<NV extends NodeValue = NodeValue> {
+    _internal: {
+        tree: TreeInternal;
+    }
+    string_path: string;
     get_value: () => NV;
     set_value: (value: NV) => void;
-    get_node: <RNP extends SubPath<TD, NP>>(string_path: RNP) => Node<PathValue<TD, MergePath<TD, NP, RNP>>, TD, MergePath<TD, NP, RNP>>;
-    // add_listener: (listen_to_child: boolean, events: NodeListenerEvents<TD, NP>) => NodeListener<TD, NP>;
-    // rem_listener: (listener: NodeListener<TD, NP>) => void;
+    get_node: <P extends Path<NV>>(string_path: P) => Node<PathValue<NV, P>>;
+    add_listener: (listen_to_child: boolean, events: NodeListenerEvents) => NodeListener;
+    rem_listener: (listener: NodeListener) => void;
 }
 
-export type GetOnlyNode<NV extends NodeValue = NodeValue, TD extends TreeValue = TreeValue, NP extends Path<TD, ExactType<NV>> = Path<TD, ExactType<NV>>> = Omit<Node<NV, TD, NP>, "set_value" | "get_node"> & {
-    get_node: <RNP extends SubPath<TD, NP>>(string_path: RNP) => GetOnlyNode<PathValue<TD, MergePath<TD, NP, RNP>>, TD, MergePath<TD, NP, RNP>>;
+export type GetOnlyNode<NV extends NodeValue = NodeValue> = Omit<Node<NV>, "set_value" | "get_node"> & {
+    get_node: <P extends Path<NV>>(string_path: P) => GetOnlyNode<PathValue<NV, P>>
 };
 
-export type SetOnlyNode<NV extends NodeValue = NodeValue, TD extends TreeValue = TreeValue, NP extends Path<TD, ExactType<NV>> = Path<TD, ExactType<NV>>> = Omit<Node<NV, TD, NP>, "get_value" | "get_node"> & {
-    get_node: <RNP extends SubPath<TD, NP>>(string_path: RNP) => SetOnlyNode<PathValue<TD, MergePath<TD, NP, RNP>>, TD, MergePath<TD, NP, RNP>>;
+export type SetOnlyNode<NV extends NodeValue = NodeValue> = Omit<Node<NV>, "get_value" | "get_node"> & {
+    get_node: <P extends Path<NV>>(string_path: P) => SetOnlyNode<PathValue<NV, P>>
 };
 
-const _get_node_handle = <TD extends TreeValue, NP extends Path<TD>>(tree: TreeInternal<TD>, string_path: NP): Node<PathValue<TD, NP>, TD, NP> => {
+const _get_node_handle = <NV extends NodeValue, NP extends Path<NV>>(tree: TreeInternal, string_path: NP): Node<PathValue<NV, NP>> => {
     return {
         _internal: {
             tree
         },
         string_path,
-        get_value: () => _get_node_value(tree, string_path),
+        get_value: () => _get_node_value(tree, string_path) as PathValue<NV, NP>,
         set_value: (new_value) => { _set_node_value(tree, string_path, new_value); },
-        get_node: (path) => _get_node_handle(tree, `${string_path}${path}` as MergePath<TD, NP, typeof path>),
+        get_node: <RNP extends Path<NV>>(path: RNP) => _get_node_handle<NV, RNP>(tree, `${string_path}${path}` as unknown as Path<NV>),
         add_listener: (listen_to_child, events) => _add_listener(tree, string_path, listen_to_child, events),
         rem_listener: (listener) => { _rem_listener(tree, string_path, listener); }
     }
@@ -569,11 +570,9 @@ const _get_node_handle = <TD extends TreeValue, NP extends Path<TD>>(tree: TreeI
 
 export interface Tree<TD extends TreeValue = TreeValue> {
     _internal: {
-        tree: TreeInternal<TD>;
+        tree: TreeInternal;
     }
-    get_value: <NP extends Path<TD>>(string_path: NP) => PathValue<TD, NP>;
-    set_value: <NP extends Path<TD>>(string_path: NP, value: PathValue<TD, NP>) => void;
-    get_node: <NP extends Path<TD>>(string_path: NP) => Node<PathValue<TD, NP>, TD, NP>;
+    get_node: <NP extends Path<TD>>(string_path: NP) => Node<PathValue<TD, NP>>;
 }
 
 const make_tree = <TD extends TreeValue>(value: TD): Tree<TD> => {
@@ -583,9 +582,7 @@ const make_tree = <TD extends TreeValue>(value: TD): Tree<TD> => {
         _internal: {
             tree
         },
-        get_value: (path) => _get_node_value(tree, path),
-        set_value: (path, value) => { _set_node_value(tree, path, value); },
-        get_node: (path) => _get_node_handle(tree, path)
+        get_node: <NP extends Path<TD>>(path: NP) => _get_node_handle<TD, NP>(tree, path)
     };
 }
 

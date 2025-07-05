@@ -108,7 +108,7 @@ type FieldPathInternal<T, TR extends TypeRange, TraversedTypes = T> =
             : { [K in keyof T]-?: FieldPathImpl<K & string, T[K], TR, TraversedTypes> }[keyof T];
 
 export type FieldPath<T, TR extends TypeRange, TraversedTypes = T> = T extends any ? FieldPathInternal<T, TR, TraversedTypes> : never;
-export type Path<T, TR extends TypeRange = TypeRange> = IsUnknown<T> extends true ? string : (FieldPath<T, TR> | (InRange<T, TR> extends true ? "" : never));
+export type Path<T, TR extends TypeRange = TypeRange> = IsUnknown<T> extends true ? never : (FieldPath<T, TR> | (InRange<T, TR> extends true ? "" : never));
 
 export type PathValue<T, P extends Path<T>> =
     IsUnknown<T> extends true 
@@ -135,35 +135,3 @@ export type PathValue<T, P extends Path<T>> =
                         : never
 
             : never;
-
-export type SubPath<T, P extends Path<T>> =
-    IsUnknown<T> extends true 
-        ? never
-        : T extends any
-            ? P extends ""
-                ? Path<T>
-                : P extends `.${infer K}.${infer R}`
-                    ? K extends keyof T
-                        ? SubPath<T[K], `.${R}` & Path<T[K]>>
-                        : K extends `${ArrayKey}`
-                            ? T extends readonly (infer V)[]
-                                    ? SubPath<V, `.${R}` & Path<V>>
-                                    : never
-                            : never
-                    : P extends `.${infer K}`
-                        ? K extends keyof T
-                            ? Path<T[K]>
-                            : K extends `${ArrayKey}`
-                                ? T extends readonly (infer V)[]
-                                        ? Path<V>
-                                        : never
-                                : never
-                        : never
-            : never;
-
-export type MergePath<TD, NP extends Path<TD>, RNP extends SubPath<TD, NP>> =
-    NP extends "" 
-        ? RNP & Path<TD>
-        : RNP extends "" 
-            ? NP
-            : `${NP}${RNP}` & Path<TD>;

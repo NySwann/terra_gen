@@ -1,22 +1,15 @@
 import './App.css'
 import "@mantine/core/styles.css";
-import { AppShell, Flex, MantineProvider, Text } from '@mantine/core';
+
+import { AppShell, Group, MantineProvider, Stack, Text } from '@mantine/core';
 import { theme } from '../theme';
 import { Navbar } from '../components/shell/Navbar/Navbar';
-import { Aside } from '@/components/shell/Aside/Aside';
 import z from 'zod';
 import { useForm } from '../fraktal/FormController';
-import { zodResolver } from '../fraktal/FormController/zodResolver';
 import { FormInputText } from '../fraktal/FormController/FormInputText';
 import { FormDisplayJson } from '../fraktal/FormController/FormDisplayJson';
-import type { GetOnlyNode, Tree, Node } from '../fraktal/lokta/tree';
-
-const address_schema = z.object({
-  country: z.string(),
-  city: z.string(),
-  postal_code: z.string(),
-  street: z.string(),
-})
+import { Aside } from '../components/shell/Aside/Aside';
+import { address_schema, FormInputAddress } from '../fraktal/FormController/FormInputAddress';
 
 const birth_schema = z.object({
   address: address_schema,
@@ -46,18 +39,6 @@ const user_schema = z.object({
 
 type User = z.infer<typeof user_schema>;
 
-const t: Tree<User>;
-
-const a = t.get_node(".address.country");
-
-type g = (typeof a)["get_node"];
-
-let b: GetOnlyNode;
-
-let c: Node<User, User, "">;
-
-b = c;
-
 function FormApp() {
   const formHandle = useForm<User>({
     defaultValues: {
@@ -84,8 +65,9 @@ function FormApp() {
       </AppShell.Header>
       <Navbar />
       <AppShell.Main style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <FormInputText node={formHandle._internal.tree.get_node(".username")} />
-        <FormDisplayJson node={formHandle._internal.tree.get_node("")} />
+        <Stack w={1000} h={1000}>
+          <FormInputAddress node={formHandle._internal.tree.get_node(".address")} />
+          <FormDisplayJson node={formHandle._internal.tree.get_node("")} /></Stack>
       </AppShell.Main>
       <Aside />
       <AppShell.Footer style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>

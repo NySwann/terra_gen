@@ -1,6 +1,6 @@
-import ReactJson from 'react-json-view';
 import type { GetOnlyNode } from '../lokta/tree';
 import { useNodeValue } from './useNodeValue';
+import { JsonInput } from '@mantine/core';
 
 interface Props {
   node: GetOnlyNode;
@@ -11,10 +11,11 @@ const FormDisplayJson = ({
 }: Props) => {
   const value = useNodeValue({
     node: node,
-    child: false
+    child: true,
+    transform: (v) => JSON.stringify(v, null, 2)
   });
 
-  return <ReactJson src={value as object} />
+  return <JsonInput value={value} autosize minRows={4} minLength={200} />
 };
 
 export { FormDisplayJson };
