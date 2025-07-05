@@ -1,5 +1,5 @@
 import { type Ref, useCallback, useEffect, useRef, useImperativeHandle } from "react";
-import { make_tree } from "../lokta/tree";
+import { make_tree, type Tree } from "../lokta/tree";
 import type { BrowserNativeObject, IsAny, Primitive, Path, PathValue } from "../lokta/types";
 
 export type NonUndefined<T> = T extends undefined ? never : T;
@@ -108,7 +108,7 @@ interface _FormInternal<T extends FormContent> {
   name?: string;
   state: FormState<T>;
   subject: Subject<FormState<T>>;
-  tree: TreeHandle<T>;
+  tree: Tree<T>;
 }
 
 export interface FormHandle<T extends FormContent> {
@@ -285,7 +285,6 @@ const _createInternal = <FC extends FormContent>(
       firstRender: true,
       errors: {},
     },
-    subject: new Subject<FormState<FC>>(),
   };
 };
 

@@ -4,22 +4,22 @@ import { useCallback, useEffect, useState } from 'react';
 import type { GetOnlyNode, NodeValue } from '../lokta/tree';
 
 interface UseNodeValueProps<NV extends NodeValue> {
-  nodeHandle: GetOnlyNode<NV>,
+  node: GetOnlyNode<NV>,
   child: boolean;
 }
 
 export const useNodeValue = <NV extends NodeValue>({
-  nodeHandle,
+  node,
   child
 }: UseNodeValueProps<NV>): NV => {
-  const getValue = useCallback(() => nodeHandle.get_value(), [nodeHandle]);
+  const getValue = useCallback(() => node.get_value(), [node]);
 
   const [value, setValue] = useState<NV>(getValue());
 
   useEffect(() => {
     setValue(getValue());
 
-    const listener = nodeHandle.add_listener(child, {
+    const listener = node.add_listener(child, {
       on_events: (events) => {
         if (child) {
           setValue(getValue());
@@ -28,15 +28,15 @@ export const useNodeValue = <NV extends NodeValue>({
         }
 
         for (const e of events) {
-          if (e.string_path === nodeHandle.string_path) {
+          if (e.string_path === node.string_path) {
             setValue(getValue());
           }
         }
       }
     })
 
-    return () => { nodeHandle.rem_listener(listener); };
-  }, [child, getValue, nodeHandle]
+    return () => { node.rem_listener(listener); };
+  }, [child, getValue, node]
   );
 
   return value;

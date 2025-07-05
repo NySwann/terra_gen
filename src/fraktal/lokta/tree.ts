@@ -1,4 +1,4 @@
-import type { ExactType, MergePath, Path, PathByType, PathValue, SubPath, TypeRange, TypeRange_Set, TypeRange_Get } from "./types";
+import type { ExactType, MergePath, Path, PathByType, PathValue, SubPath, TypeRange, TypeRange_Set, TypeRange_Get, IsNever } from "./types";
 
 export type TreeValue = unknown;
 export type NodeValue = unknown;
@@ -531,20 +531,27 @@ const _get_node_value = <TD extends TreeValue, NP extends Path<TD>>(tree: TreeIn
     return value;
 }
 
+type f = SubPath<TreeValue, Path<TreeValue, ExactType<NodeValue>>>;
+
 export interface Node<NV extends NodeValue = NodeValue, TD extends TreeValue = TreeValue, NP extends Path<TD, ExactType<NV>> = Path<TD, ExactType<NV>>> {
-    _internal: {
-        tree: TreeInternal<TD>;
-    }
+    // _internal: {
+    //     tree: TreeInternal<TD>;
+    // }
     string_path: NP;
     get_value: () => NV;
     set_value: (value: NV) => void;
     get_node: <RNP extends SubPath<TD, NP>>(string_path: RNP) => Node<PathValue<TD, MergePath<TD, NP, RNP>>, TD, MergePath<TD, NP, RNP>>;
-    add_listener: (listen_to_child: boolean, events: NodeListenerEvents<TD, NP>) => NodeListener<TD, NP>;
-    rem_listener: (listener: NodeListener<TD, NP>) => void;
+    // add_listener: (listen_to_child: boolean, events: NodeListenerEvents<TD, NP>) => NodeListener<TD, NP>;
+    // rem_listener: (listener: NodeListener<TD, NP>) => void;
 }
 
-export type GetOnlyNode<NV extends NodeValue = NodeValue, TD extends TreeValue = TreeValue, NP extends Path<TD, ExactType<NV>> = Path<TD, ExactType<NV>>> = Omit<Node<NV, TD, NP>, "set_value">;
-export type SetOnlyNode<NV extends NodeValue = NodeValue, TD extends TreeValue = TreeValue, NP extends Path<TD, ExactType<NV>> = Path<TD, ExactType<NV>>> = Omit<Node<NV, TD, NP>, "get_value">;
+export type GetOnlyNode<NV extends NodeValue = NodeValue, TD extends TreeValue = TreeValue, NP extends Path<TD, ExactType<NV>> = Path<TD, ExactType<NV>>> = Omit<Node<NV, TD, NP>, "set_value" | "get_node"> & {
+    get_node: <RNP extends SubPath<TD, NP>>(string_path: RNP) => GetOnlyNode<PathValue<TD, MergePath<TD, NP, RNP>>, TD, MergePath<TD, NP, RNP>>;
+};
+
+export type SetOnlyNode<NV extends NodeValue = NodeValue, TD extends TreeValue = TreeValue, NP extends Path<TD, ExactType<NV>> = Path<TD, ExactType<NV>>> = Omit<Node<NV, TD, NP>, "get_value" | "get_node"> & {
+    get_node: <RNP extends SubPath<TD, NP>>(string_path: RNP) => SetOnlyNode<PathValue<TD, MergePath<TD, NP, RNP>>, TD, MergePath<TD, NP, RNP>>;
+};
 
 const _get_node_handle = <TD extends TreeValue, NP extends Path<TD>>(tree: TreeInternal<TD>, string_path: NP): Node<PathValue<TD, NP>, TD, NP> => {
     return {
