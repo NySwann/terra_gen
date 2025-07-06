@@ -3,6 +3,7 @@ import { type ChangeEventHandler, useCallback } from 'react';
 import type { Node } from '../lokta/tree';
 import { identity, useNodeValue } from './useNodeValue';
 import type { FormInputBaseProps } from './FormInputBase';
+import { useNodeError } from './useNodeError';
 
 interface Props extends FormInputBaseProps {
   node: Node<string>;
@@ -18,11 +19,17 @@ function FormInputText({
     transform: identity
   });
 
+  const error = useNodeError({
+    node
+  })
+
+  console.log(error);
+
   const onChange: ChangeEventHandler<HTMLInputElement> = useCallback((newValue) => {
     node.set_value(newValue.target.value);
   }, [node])
 
-  return <TextInput value={value} onChange={onChange} label={label ?? node.string_path} />
+  return <TextInput value={value} onChange={onChange} label={label ?? node.string_path} error={error?.message} />
 };
 
 export { FormInputText };

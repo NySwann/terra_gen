@@ -25,15 +25,19 @@ export function useNodeValue<NV extends NodeValue, Out>({
   useEffect(() => {
     const listener = node.add_listener(child, {
       on_events: (events) => {
-        if (child) {
-          setValue(getValue());
+        const value_events = events.filter(e => e.type === "value_change");
 
-          return;
-        }
-
-        for (const e of events) {
-          if (e.string_path === node.string_path) {
+        if (value_events.length) {
+          if (child) {
             setValue(getValue());
+
+            return;
+          }
+
+          for (const e of events) {
+            if (e.string_path === node.string_path) {
+              setValue(getValue());
+            }
           }
         }
       }

@@ -118,7 +118,8 @@ export interface NodeInternal {
     last_acknowledged_event: number;
 }
 
-interface NodeEvent {
+interface NodeValueChangeEvent {
+    type: "value_change";
     string_path: string;
     array_path: string[];
     old_value: unknown;
@@ -126,9 +127,21 @@ interface NodeEvent {
     ack: number;
 }
 
+interface NodeErrorChangeEvent {
+    type: "error_change";
+    string_path: string;
+    array_path: string[];
+    old_error: unknown;
+    new_error: unknown;
+    ack: number;
+}
+
+type NodeEvent = NodeValueChangeEvent | NodeErrorChangeEvent;
+
 interface TreeInternal {
     root: NodeInternal
     value: unknown,
+    errors: unknown,
     nodes: Record<string, NodeInternal | undefined>;
     last_event: number;
     history: NodeEvent[];
@@ -337,6 +350,7 @@ const _make_tree_internal = (value: unknown): TreeInternal => {
     const tree: TreeInternal = {
         root: null,
         value,
+        errors: {},
         nodes: {},
         fire_in_progress: false,
         cursors: [],
@@ -451,6 +465,7 @@ const _insert_event = (tree: TreeInternal, event: NodeEvent, max_insertion_point
     let insertion_point: NodeInternal | null = current;
 
     if (insertion_point === max_insertion_point) {
+        console.error(insertion_point);
         throw new Error();
     }
 
@@ -523,7 +538,7 @@ const _set_node_value = (tree: TreeInternal, string_path: string, new_value: unk
 
     tree.last_event++;
 
-    const event: NodeEvent = { string_path, array_path: string_path.split("."), old_value, new_value, ack: tree.last_event };
+    const event: NodeValueChangeEvent = { type: "value_change", string_path, array_path: string_path.split("."), old_value, new_value, ack: tree.last_event };
 
     _insert_event(tree, event);
 }
@@ -534,6 +549,33 @@ const _get_node_value = (tree: TreeInternal, string_path: string): unknown => {
     return value;
 }
 
+export type NodeError =
+    {
+        message: string
+    } | undefined
+
+const _set_node_error = (tree: TreeInternal, string_path: string, new_error: NodeError): void => {
+    const old_error = get_at_string_path(tree.errors, string_path);
+
+    if (value_equal(new_error, old_error)) {
+        throw new Error("Same value");
+    }
+
+    tree.errors = set_at_string_path(tree.value, string_path, new_error);
+
+    tree.last_event++;
+
+    const event: NodeErrorChangeEvent = { type: "error_change", string_path, array_path: string_path.split("."), old_error, new_error, ack: tree.last_event };
+
+    _insert_event(tree, event);
+}
+
+const _get_node_error = (tree: TreeInternal, string_path: string): NodeError => {
+    const value = get_at_string_path(tree.errors, string_path);
+
+    return value as NodeError;
+}
+
 export interface Node<NV extends NodeValue = NodeValue> {
     _internal: {
         tree: TreeInternal;
@@ -541,6 +583,8 @@ export interface Node<NV extends NodeValue = NodeValue> {
     string_path: string;
     get_value: () => NV;
     set_value: (value: NV) => void;
+    get_error: () => NodeError;
+    set_error: (value: NodeError) => void;
     get_node: <P extends Path<NV>>(string_path: P) => Node<PathValue<NV, P>>;
     add_listener: (listen_to_child: boolean, events: NodeListenerEvents) => NodeListener;
     rem_listener: (listener: NodeListener) => void;
@@ -562,6 +606,8 @@ const _get_node_handle = <NV extends NodeValue, NP extends Path<NV>>(tree: TreeI
         string_path,
         get_value: () => _get_node_value(tree, string_path) as PathValue<NV, NP>,
         set_value: (new_value) => { _set_node_value(tree, string_path, new_value); },
+        get_error: () => _get_node_error(tree, string_path),
+        set_error: (new_value) => { _set_node_error(tree, string_path, new_value); },
         get_node: <RNP extends Path<NV>>(path: RNP) => _get_node_handle<NV, RNP>(tree, `${string_path}${path}` as unknown as Path<NV>),
         add_listener: (listen_to_child, events) => _add_listener(tree, string_path, listen_to_child, events),
         rem_listener: (listener) => { _rem_listener(tree, string_path, listener); }

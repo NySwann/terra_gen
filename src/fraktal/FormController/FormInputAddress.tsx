@@ -11,9 +11,9 @@ type Country = (typeof Country)[number];
 
 export const address_schema = z.object({
   country: z.enum(Country),
-  city: z.string(),
+  city: z.string().min(2),
   postal_code: z.number(),
-  street: z.string(),
+  street: z.string().min(2),
 })
 
 export type Address = z.infer<typeof address_schema>;
@@ -26,7 +26,7 @@ function FormInputAddress({
   node,
   label
 }: Props) {
-  return <Paper withBorder>
+  return <Paper withBorder p="md">
     <Stack>
       <h1>{label ?? node.string_path}</h1>
       <FormInputSelect node={node.get_node(".country")} options={Country} />
