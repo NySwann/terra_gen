@@ -1,5 +1,5 @@
 import { type Ref, useCallback, useEffect, useRef, useImperativeHandle } from "react";
-import { make_tree, type Tree } from "../lokta/tree";
+import { make_tree, type ReactiveTree, type Tree, type TreeErrors } from "../lokta/tree";
 import type { BrowserNativeObject, IsAny, Primitive, Path, PathValue } from "../lokta/types";
 
 export type NonUndefined<T> = T extends undefined ? never : T;
@@ -33,22 +33,19 @@ type DirtyFields<FC extends FormContent> = Partial<
   Readonly<DeepMap<DeepPartial<FC>, boolean>>
 >;
 
-export interface FieldErrors<T extends FormContent = FormContent> { }
+export type FieldErrors = Record<string, { error: string }>;
 
 type DefaultValues<FC extends FormContent> = DeepPartial<FC>;
 
-interface ValidationResolver<FC extends FormContent> { }
+type ValidationResolver<FC extends FormContent> = (values: FC) => TreeErrors;
 
 type OnFormValidHandler<FC extends FormContent> = (
   data: FC,
-  dirtyFields: DirtyFields<FC>,
-  event?: React.BaseSyntheticEvent
-) => unknown | Promise<unknown>;
+) => void;
 
 type OnFormInvalidHandler<FC extends FormContent> = (
-  errors: FieldErrors<FC>,
-  event?: React.BaseSyntheticEvent,
-) => unknown | Promise<unknown>;
+  errors: FieldErrors,
+) => void;
 
 type OnFormSave<FC extends FormContent> = (
   onValid: OnFormValidHandler<FC>,
@@ -108,7 +105,7 @@ interface _FormInternal<T extends FormContent> {
   name?: string;
   state: FormState<T>;
   subject: Subject<FormState<T>>;
-  tree: Tree<T>;
+  tree: ReactiveTree<T, { isReadOnly: boolean }, { error: string } | undefined>;
 }
 
 export interface FormHandle<T extends FormContent> {
@@ -204,14 +201,16 @@ const _saveForm = <FC extends FormContent>(
   onValid: OnFormValidHandler<FC>,
   onInvalid?: OnFormInvalidHandler<FC>
 ) => {
-  // return internal.formProps.handleSubmit(
-  //   (data, event) => onValid(data, internal.state.dirtyFields, event),
-  //   (errors) => {
-  //     console.warn(internal.name, internal.id, internal.formProps.getValues());
-  //     console.warn(internal.name, internal.id, errors);
-  //     onInvalid?.(errors);
-  //   }
-  // )();
+  const values = internal.tree.get_node("").get_data();
+  const errors = internal.state.validationResolver(values);
+
+  internal.tree.set_node_meta_bulk(errors);
+
+  if (Object.keys(errors).length) {
+    onInvalid?.(errors);
+  } else {
+    onValid(values)
+  }
 };
 
 const _triggerForm = <FC extends FormContent>(
@@ -273,7 +272,7 @@ const _createInternal = <FC extends FormContent>(
   name?: string
 ): _FormInternal<FC> => {
   return {
-    tree: make_tree<FC>(defaultValues),
+    tree: make_tree<FC>(defaultValues, {}, {}),
     name,
     state: {
       isValid: false,

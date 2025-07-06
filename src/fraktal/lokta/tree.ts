@@ -1,16 +1,20 @@
-import type { Path, PathValue } from "./types";
+import { CompareValuesWithDetailedDifferences } from "./compare";
+import type { Path, PathData } from "./types";
 
-export type TreeValue = unknown;
-export type NodeValue = unknown;
+export type ReactiveTreeData = unknown;
+export type ReactiveNodeData = unknown;
 
-const value_equal = (v1: unknown, v2: unknown) => Object.is(v1, v2);
+export type ReactiveTreeMeta = unknown;
+export type ReactiveNodeMeta = unknown;
 
-const get_at_string_path = <R, P extends Path<R>>(
-    root: R,
-    string_path: P,
-): PathValue<R, P> | undefined => {
+const data_equal = (v1: unknown, v2: unknown) => Object.is(v1, v2);
+
+const get_at_string_path = (
+    root: unknown,
+    string_path: string,
+): unknown => {
     if (string_path === "") {
-        return root as PathValue<R, P>;
+        return root;
     }
 
     const parts = string_path.split(".");
@@ -29,29 +33,29 @@ const get_at_string_path = <R, P extends Path<R>>(
     while (++index < parts_length) {
         const key = parts[index];
 
-        const current_value = (node as any)[key];
+        const current_data = (node as any)[key];
 
         if (index !== lastIndex) {
-            if (current_value === null || current_value === undefined) {
-                return current_value;
+            if (current_data === null || current_data === undefined) {
+                return current_data;
             }
 
-            node = current_value;
+            node = current_data;
         } else {
-            return current_value;
+            return current_data;
         }
     }
 
     throw new Error("Unreachable");
 }
 
-const set_at_string_path = <R, P extends Path<R>>(
-    root: R,
-    string_path: P,
-    new_value: PathValue<R, P>,
-) => {
+const set_at_string_path = (
+    root: unknown,
+    string_path: string,
+    new_data: unknown,
+): unknown => {
     if (string_path === "") {
-        return new_value;
+        return new_data;
     }
 
     const parts = string_path.split(".");
@@ -70,9 +74,9 @@ const set_at_string_path = <R, P extends Path<R>>(
         const key = parts[index];
 
         if (index !== lastIndex) {
-            const current_value = (node as any)[key];
+            const current_data = (node as any)[key];
 
-            if (current_value === null || current_value === undefined) {
+            if (current_data === null || current_data === undefined) {
                 if (!isNaN(+parts[index + 1])) {
                     (node as any)[key] = [];
                 } else {
@@ -82,9 +86,9 @@ const set_at_string_path = <R, P extends Path<R>>(
 
             node = (node as any)[key];
         } else {
-            (node as any)[key] = new_value;
+            (node as any)[key] = new_data;
 
-            return root as PathValue<R, P>;
+            return root;
         }
     }
 
@@ -92,69 +96,80 @@ const set_at_string_path = <R, P extends Path<R>>(
 };
 
 
-interface NodeListenerEvents {
-    on_events?: (events: NodeEvent[]) => void;
+interface ReactiveNodeListenerEvents {
+    on_events?: (events: (ReactiveTreeEvent | ReactiveNodeEvent)[]) => void;
 }
 
-interface NodeListener {
+interface ReactiveNodeListener {
     listen_to_child: boolean;
     last_acknowledged_event: number;
-    events: NodeListenerEvents;
+    events: ReactiveNodeListenerEvents;
 }
 
-export interface NodeInternal {
-    tree: TreeInternal;
+export interface ReactiveNodeInternal {
+    tree: ReactiveTreeInternal;
     string_path: string;
     array_path: string[];
-    parent: NodeInternal | null;
-    childs: NodeInternal[];
-    childs_with_events: NodeInternal[];
-    listeners: NodeListener[];
+    parent: ReactiveNodeInternal | null;
+    childs: ReactiveNodeInternal[];
+    childs_with_events: ReactiveNodeInternal[];
+    listeners: ReactiveNodeListener[];
     events: {
-        childs: NodeEvent[],
-        exact: NodeEvent[],
+        childs: ReactiveNodeEvent[],
+        exact: ReactiveNodeEvent[],
+        tree: ReactiveTreeEvent[],
     }
     listen_to_child: boolean;
     last_acknowledged_event: number;
 }
 
-interface NodeValueChangeEvent {
-    type: "value_change";
+interface ReactiveNodeDataChangeEvent {
+    type: "node_data_change";
     string_path: string;
     array_path: string[];
-    old_value: unknown;
-    new_value: unknown;
+    old_data: unknown;
+    new_data: unknown;
     ack: number;
 }
 
-interface NodeErrorChangeEvent {
-    type: "error_change";
+interface ReactiveNodeMetaChangeEvent {
+    type: "node_meta_change";
     string_path: string;
     array_path: string[];
-    old_error: unknown;
-    new_error: unknown;
+    old_meta: unknown;
+    new_meta: unknown;
     ack: number;
 }
 
-type NodeEvent = NodeValueChangeEvent | NodeErrorChangeEvent;
+interface ReactiveTreeMetaChangeEvent {
+    type: "tree_meta_change";
+    old_meta: unknown;
+    new_meta: unknown;
+    ack: number;
+}
 
-interface TreeInternal {
-    root: NodeInternal
-    value: unknown,
-    errors: unknown,
-    nodes: Record<string, NodeInternal | undefined>;
+type ReactiveNodeEvent = ReactiveNodeDataChangeEvent | ReactiveNodeMetaChangeEvent;
+type ReactiveTreeEvent = ReactiveTreeMetaChangeEvent;
+
+interface ReactiveTreeInternal {
+    root: ReactiveNodeInternal
+    data: ReactiveTreeData,
+    tree_meta: ReactiveTreeMeta,
+    node_meta: Record<string, ReactiveNodeMeta>;
+    nodes: Record<string, ReactiveNode | undefined>;
+    nodes_with_events: Record<string, ReactiveNodeInternal | undefined>;
     last_event: number;
-    history: NodeEvent[];
+    history: ReactiveNodeEvent[];
     fire_in_progress: boolean;
 }
 
-const _find_parent_node = (tree: TreeInternal, string_path: string): NodeInternal => {
+const _find_parent_node = (tree: ReactiveTreeInternal, string_path: string): ReactiveNodeInternal => {
     let parent_node = undefined;
     let x = string_path.length - 1;
 
     while (x > 0) {
         if (string_path[x] === '.') {
-            parent_node = tree.nodes[string_path.substring(0, x)];
+            parent_node = tree.nodes_with_events[string_path.substring(0, x)];
 
             if (parent_node) {
                 break;
@@ -191,15 +206,15 @@ const _classify_relative = (array_path: string[], other_array_path: string[]) =>
     return "exact";
 }
 
-interface RelativeNodes {
-    exact: NodeInternal[];
-    parents: NodeInternal[];
-    childs: NodeInternal[];
-    unrelated: NodeInternal[];
+interface RelativeReactiveNodes {
+    exact: ReactiveNodeInternal[];
+    parents: ReactiveNodeInternal[];
+    childs: ReactiveNodeInternal[];
+    unrelated: ReactiveNodeInternal[];
 }
 
-const _classify_relatives = (array_path: string[], nodes: NodeInternal[]): RelativeNodes => {
-    const relatives: RelativeNodes = {
+const _classify_relatives = (array_path: string[], nodes: ReactiveNodeInternal[]): RelativeReactiveNodes => {
+    const relatives: RelativeReactiveNodes = {
         parents: [],
         childs: [],
         unrelated: [],
@@ -223,7 +238,7 @@ const _classify_relatives = (array_path: string[], nodes: NodeInternal[]): Relat
     return relatives;
 }
 
-const _link_node = (node: NodeInternal) => {
+const _link_node = (node: ReactiveNodeInternal) => {
     const tree = node.tree;
 
     const parent = _find_parent_node(tree, node.string_path);
@@ -240,10 +255,10 @@ const _link_node = (node: NodeInternal) => {
     parent.childs.push(...relatives.unrelated, node);
     parent.childs.forEach(c => c.parent = parent);
 
-    tree.nodes[node.string_path] = node;
+    tree.nodes_with_events[node.string_path] = node;
 }
 
-const _unlink_node_from_events = (node: NodeInternal) => {
+const _unlink_node_from_events = (node: ReactiveNodeInternal) => {
     if (node.string_path === "") {
         throw new Error("");
     }
@@ -272,7 +287,7 @@ const _unlink_node_from_events = (node: NodeInternal) => {
     }
 }
 
-const _unlink_node = (node: NodeInternal) => {
+const _unlink_node = (node: ReactiveNodeInternal) => {
     const tree = node.tree;
 
     if (node.string_path === "") {
@@ -284,15 +299,15 @@ const _unlink_node = (node: NodeInternal) => {
     _unlink_node_from_events(node);
 
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-    delete tree.nodes[node.string_path];
+    delete tree.nodes_with_events[node.string_path];
 
     node.parent?.childs.splice(node.parent.childs.indexOf(node), 1);
     node.parent?.childs.push(...node.childs);
     node.parent?.childs.forEach(c => c.parent = node.parent);
 }
 
-const _add_listener = (tree: TreeInternal, string_path: string, listen_to_child: boolean, events: NodeListenerEvents) => {
-    let node = tree.nodes[string_path];
+const _add_listener = (tree: ReactiveTreeInternal, string_path: string, listen_to_child: boolean, events: ReactiveNodeListenerEvents) => {
+    let node = tree.nodes_with_events[string_path];
 
     if (!node) {
         node = {
@@ -307,14 +322,15 @@ const _add_listener = (tree: TreeInternal, string_path: string, listen_to_child:
             last_acknowledged_event: tree.last_event,
             events: {
                 childs: [],
-                exact: []
+                exact: [],
+                tree: [],
             }
         }
 
         _link_node(node);
     }
 
-    const listener: NodeListener = {
+    const listener: ReactiveNodeListener = {
         listen_to_child,
         last_acknowledged_event: node.last_acknowledged_event,
         events
@@ -327,11 +343,11 @@ const _add_listener = (tree: TreeInternal, string_path: string, listen_to_child:
     return listener;
 }
 
-const _rem_listener = (tree: TreeInternal, string_path: string, listener: NodeListener) => {
-    const node = tree.nodes[string_path]
+const _rem_listener = (tree: ReactiveTreeInternal, string_path: string, listener: ReactiveNodeListener) => {
+    const node = tree.nodes_with_events[string_path]
 
     if (!node) {
-        throw new Error("Node not existing");
+        throw new Error("ReactiveNode not existing");
     }
 
     if (!node.listeners.includes(listener)) {
@@ -346,18 +362,19 @@ const _rem_listener = (tree: TreeInternal, string_path: string, listener: NodeLi
     }
 }
 
-const _make_tree_internal = (value: unknown): TreeInternal => {
-    const tree: TreeInternal = {
+const _make_tree_internal = (data: ReactiveTreeData, tree_meta: ReactiveTreeMeta, node_meta: Record<string, ReactiveNodeMeta>): ReactiveTreeInternal => {
+    const tree: ReactiveTreeInternal = {
         root: null,
-        value,
-        errors: {},
-        nodes: {},
+        data,
+        tree_meta,
+        node_meta,
+        nodes_with_events: {},
         fire_in_progress: false,
         cursors: [],
         last_event: -1,
     }
 
-    const root: NodeInternal = {
+    const root: ReactiveNodeInternal = {
         listeners: [],
         string_path: "",
         array_path: [""],
@@ -369,17 +386,18 @@ const _make_tree_internal = (value: unknown): TreeInternal => {
         events: {
             childs: [],
             exact: [],
+            tree: [],
         },
         last_acknowledged_event: tree.last_event
     }
 
     tree.root = root;
-    tree.nodes[""] = root;
+    tree.nodes_with_events[""] = root;
 
     return tree;
 }
 
-const _fire_events = (tree: TreeInternal) => {
+const _fire_events = (tree: ReactiveTreeInternal) => {
     if (tree.fire_in_progress) {
         throw new Error("fuck");
     }
@@ -388,9 +406,9 @@ const _fire_events = (tree: TreeInternal) => {
 
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     process_events: while (true) {
-        let node_with_events: NodeInternal = tree.root;
+        let node_with_events: ReactiveNodeInternal = tree.root;
 
-        while (!node_with_events.events.childs.length && !node_with_events.events.exact.length) {
+        while (!node_with_events.events.childs.length && !node_with_events.events.exact.length && !node_with_events.events.tree.length) {
             if (!node_with_events.childs_with_events.length) {
                 break process_events;
             }
@@ -405,17 +423,17 @@ const _fire_events = (tree: TreeInternal) => {
 
         const relatives = cursor.events;
 
-        const total_events = [...relatives.exact, ...relatives.childs];
+        const total_events = [...relatives.exact, ...relatives.childs, ...relatives.tree];
         const max_ack = Math.max(...total_events.map(e => e.ack));
 
         for (const listener of cursor.listeners) {
             if (listener.last_acknowledged_event < max_ack) {
-                const not_ack_events = [...relatives.exact, ...relatives.childs].filter(e => e.ack > listener.last_acknowledged_event);
+                const not_ack_events = total_events.filter(e => e.ack > listener.last_acknowledged_event);
 
                 listener.last_acknowledged_event = max_ack;
 
                 if (not_ack_events.length) {
-                    listener.events?.on_events?.(not_ack_events);
+                    listener.events.on_events?.(not_ack_events);
 
                     if (tree.last_event != global_ack) {
                         continue process_events;
@@ -427,7 +445,7 @@ const _fire_events = (tree: TreeInternal) => {
         // all listener processed, try to update parents ack
 
         if (!relatives.childs.length) {
-            let current: NodeInternal | null = cursor;
+            let current: ReactiveNodeInternal | null = cursor;
 
             while (current != null) {
                 const max = Math.max(...current.listeners.map(l => l.last_acknowledged_event));
@@ -448,25 +466,30 @@ const _fire_events = (tree: TreeInternal) => {
         }
 
         const childs_events = [...cursor.events.childs];
+        const tree_events = [...cursor.events.tree];
 
         cursor.events.childs.splice(0, cursor.events.childs.length);
         cursor.events.exact.splice(0, cursor.events.exact.length);
+        cursor.events.tree.splice(0, cursor.events.tree.length);
+
+        for (const child of cursor.childs_with_events) {
+            _insert_tree_event(child, tree_events)
+        }
 
         for (const child_event of childs_events) {
-            _insert_event(tree, child_event, cursor);
+            _insert_node_event(tree, child_event, cursor);
         }
     }
 
     tree.fire_in_progress = false;
 }
 
-const _insert_event = (tree: TreeInternal, event: NodeEvent, max_insertion_point?: NodeInternal): void => {
-    let current: NodeInternal | null = tree.nodes[event.string_path] ?? _find_parent_node(tree, event.string_path);
-    let insertion_point: NodeInternal | null = current;
+const _insert_node_event = (tree: ReactiveTreeInternal, event: ReactiveNodeEvent, max_insertion_point?: ReactiveNodeInternal): void => {
+    let current: ReactiveNodeInternal | null = tree.nodes_with_events[event.string_path] ?? _find_parent_node(tree, event.string_path);
+    let insertion_point: ReactiveNodeInternal | null = current;
 
     if (insertion_point === max_insertion_point) {
-        console.error(insertion_point);
-        throw new Error();
+        return;
     }
 
     while (current !== null && current !== max_insertion_point) {
@@ -521,114 +544,139 @@ const _insert_event = (tree: TreeInternal, event: NodeEvent, max_insertion_point
             }
         }
     }
+}
+
+const _insert_tree_event = (node: ReactiveNodeInternal, events: ReactiveTreeEvent[]): void => {
+    node.events.tree.push(...events);
+}
+
+const _set_node_data = (tree: ReactiveTreeInternal, string_path: string, new_data: unknown): void => {
+    const old_data = get_at_string_path(tree.data, string_path);
+
+    if (data_equal(new_data, old_data)) {
+        throw new Error("Same data");
+    }
+
+    tree.data = set_at_string_path(tree.data, string_path, new_data);
+
+    tree.last_event++;
+
+    const event: ReactiveNodeDataChangeEvent = { type: "node_data_change", string_path, array_path: string_path.split("."), old_data, new_data, ack: tree.last_event };
+
+    _insert_node_event(tree, event);
 
     if (!tree.fire_in_progress) {
         _fire_events(tree);
     }
 }
 
-const _set_node_value = (tree: TreeInternal, string_path: string, new_value: unknown): void => {
-    const old_value = get_at_string_path(tree.value, string_path);
+const _get_node_data = (tree: ReactiveTreeInternal, string_path: string): unknown => {
+    const data = get_at_string_path(tree.data, string_path);
 
-    if (value_equal(new_value, old_value)) {
-        throw new Error("Same value");
-    }
-
-    tree.value = set_at_string_path(tree.value, string_path, new_value);
-
-    tree.last_event++;
-
-    const event: NodeValueChangeEvent = { type: "value_change", string_path, array_path: string_path.split("."), old_value, new_value, ack: tree.last_event };
-
-    _insert_event(tree, event);
+    return data;
 }
 
-const _get_node_value = (tree: TreeInternal, string_path: string): unknown => {
-    const value = get_at_string_path(tree.value, string_path);
-
-    return value;
-}
-
-export type NodeError =
-    {
-        message: string
-    } | undefined
-
-const _set_node_error = (tree: TreeInternal, string_path: string, new_error: NodeError): void => {
-    const old_error = get_at_string_path(tree.errors, string_path);
-
-    if (value_equal(new_error, old_error)) {
-        throw new Error("Same value");
-    }
-
-    tree.errors = set_at_string_path(tree.value, string_path, new_error);
-
-    tree.last_event++;
-
-    const event: NodeErrorChangeEvent = { type: "error_change", string_path, array_path: string_path.split("."), old_error, new_error, ack: tree.last_event };
-
-    _insert_event(tree, event);
-}
-
-const _get_node_error = (tree: TreeInternal, string_path: string): NodeError => {
-    const value = get_at_string_path(tree.errors, string_path);
-
-    return value as NodeError;
-}
-
-export interface Node<NV extends NodeValue = NodeValue> {
-    _internal: {
-        tree: TreeInternal;
-    }
+export interface ReactiveNode<ND extends ReactiveNodeData = ReactiveNodeData, NM extends ReactiveNodeMeta = ReactiveNodeMeta> {
     string_path: string;
-    get_value: () => NV;
-    set_value: (value: NV) => void;
-    get_error: () => NodeError;
-    set_error: (value: NodeError) => void;
-    get_node: <P extends Path<NV>>(string_path: P) => Node<PathValue<NV, P>>;
-    add_listener: (listen_to_child: boolean, events: NodeListenerEvents) => NodeListener;
-    rem_listener: (listener: NodeListener) => void;
+    get_data: () => ND;
+    set_data: (data: ND) => void;
+    get_meta: () => NM;
+    set_meta: (data: NM) => void;
+    get_node: <P extends Path<ND>>(string_path: P) => ReactiveNode<PathData<ND, P>, NM>;
+    add_listener: (listen_to_child: boolean, events: ReactiveNodeListenerEvents) => ReactiveNodeListener;
+    rem_listener: (listener: ReactiveNodeListener) => void;
 }
 
-export type GetOnlyNode<NV extends NodeValue = NodeValue> = Omit<Node<NV>, "set_value" | "get_node"> & {
-    get_node: <P extends Path<NV>>(string_path: P) => GetOnlyNode<PathValue<NV, P>>
+export type ReactiveNodeGetOnly<NV extends ReactiveNodeData = ReactiveNodeData, NM extends ReactiveNodeMeta = ReactiveNodeMeta> = Omit<ReactiveNode<NV, NM>, "set_data" | "set_meta" | "get_node"> & {
+    get_node: <P extends Path<NV>>(string_path: P) => ReactiveNodeGetOnly<PathData<NV, P>>
 };
 
-export type SetOnlyNode<NV extends NodeValue = NodeValue> = Omit<Node<NV>, "get_value" | "get_node"> & {
-    get_node: <P extends Path<NV>>(string_path: P) => SetOnlyNode<PathValue<NV, P>>
+export type ReactiveNodeSetOnly<NV extends ReactiveNodeData = ReactiveNodeData, NM extends ReactiveNodeMeta = ReactiveNodeMeta> = Omit<ReactiveNode<NV, NM>, "get_data" | "get_meta" | "get_node"> & {
+    get_node: <P extends Path<NV>>(string_path: P) => ReactiveNodeSetOnly<PathData<NV, P>>
 };
 
-const _get_node_handle = <NV extends NodeValue, NP extends Path<NV>>(tree: TreeInternal, string_path: NP): Node<PathValue<NV, NP>> => {
+const _get_node_meta = (tree: ReactiveTreeInternal, string_path: string): ReactiveNodeMeta => {
+    const data = tree.node_meta[string_path];
+
+    return data;
+}
+
+const _get_node_handle = <NV extends ReactiveNodeData, NP extends Path<NV>>(tree: ReactiveTreeInternal, string_path: NP): ReactiveNode<PathData<NV, NP>> => {
     return {
-        _internal: {
-            tree
-        },
         string_path,
-        get_value: () => _get_node_value(tree, string_path) as PathValue<NV, NP>,
-        set_value: (new_value) => { _set_node_value(tree, string_path, new_value); },
-        get_error: () => _get_node_error(tree, string_path),
-        set_error: (new_value) => { _set_node_error(tree, string_path, new_value); },
         get_node: <RNP extends Path<NV>>(path: RNP) => _get_node_handle<NV, RNP>(tree, `${string_path}${path}` as unknown as Path<NV>),
+        get_data: () => _get_node_data(tree, string_path) as PathData<NV, NP>,
+        set_data: (new_data) => { _set_node_data(tree, string_path, new_data); },
+        get_meta: () => _get_node_meta(tree, string_path),
         add_listener: (listen_to_child, events) => _add_listener(tree, string_path, listen_to_child, events),
         rem_listener: (listener) => { _rem_listener(tree, string_path, listener); }
     }
 }
 
-export interface Tree<TD extends TreeValue = TreeValue> {
-    _internal: {
-        tree: TreeInternal;
+const _set_node_meta_bulk = (tree: ReactiveTreeInternal, node_meta: Record<string, ReactiveNodeMeta>): void => {
+    const differences = CompareValuesWithDetailedDifferences(tree.node_meta, node_meta);
+
+    tree.node_meta = node_meta;
+
+    for (const diff of differences) {
+        tree.last_event++;
+
+        const path = diff.path.substring(1);
+
+        const event: ReactiveNodeMetaChangeEvent = { type: "node_meta_change", string_path: path, array_path: path.split("."), old_meta: diff.oldValue, new_meta: diff.newValue, ack: tree.last_event };
+
+        _insert_node_event(tree, event);
     }
-    get_node: <NP extends Path<TD>>(string_path: NP) => Node<PathValue<TD, NP>>;
+
+    if (!tree.fire_in_progress) {
+        _fire_events(tree);
+    }
 }
 
-const make_tree = <TD extends TreeValue>(value: TD): Tree<TD> => {
-    const tree = _make_tree_internal(value);
+const _get_node_meta_bulk = (tree: ReactiveTreeInternal): Record<string, ReactiveNodeMeta> => {
+    const data = tree.node_meta;
+
+    return data;
+}
+
+const _set_tree_meta = (tree: ReactiveTreeInternal, new_meta: unknown): void => {
+
+    const old_meta = tree.tree_meta;
+
+    if (new_meta === old_meta) {
+        throw new Error();
+    }
+
+    const event: ReactiveTreeMetaChangeEvent = { type: "tree_meta_change", old_meta, new_meta, ack: tree.last_event };
+
+    _insert_tree_event(tree.root, [event]);
+
+    if (!tree.fire_in_progress) {
+        _fire_events(tree);
+    }
+}
+
+const _get_tree_meta = (tree: ReactiveTreeInternal): unknown => {
+    return tree.tree_meta;
+}
+
+export interface ReactiveTree<TD extends ReactiveTreeData = ReactiveTreeData, TM extends ReactiveTreeMeta = ReactiveTreeMeta, NM extends ReactiveNodeMeta = ReactiveNodeMeta> {
+    get_node: <NP extends Path<TD>>(string_path: NP) => ReactiveNode<PathData<TD, NP>, NM>;
+    get_tree_meta: () => TM,
+    set_tree_meta: (meta: TM) => void;
+    get_node_meta_bulk: () => Record<string, NM>;
+    set_node_meta_bulk: (meta: Record<string, NM>) => void;
+}
+
+const make_tree = <TD extends ReactiveTreeData = ReactiveTreeData, TM extends ReactiveTreeMeta = ReactiveTreeMeta, NM extends ReactiveNodeMeta = ReactiveNodeMeta>(data: TD, tree_meta: TM, node_meta: Record<Path<TD>, NM>): ReactiveTree<TD> => {
+    const tree = _make_tree_internal(data, tree_meta, node_meta);
 
     return {
-        _internal: {
-            tree
-        },
-        get_node: <NP extends Path<TD>>(path: NP) => _get_node_handle<TD, NP>(tree, path)
+        get_node: <NP extends Path<TD>>(path: NP) => _get_node_handle<TD, NP>(tree, path),
+        get_tree_meta: () => _get_tree_meta(tree),
+        set_tree_meta: (meta) => { _set_tree_meta(tree, meta); },
+        get_node_meta_bulk: () => _get_node_meta_bulk(tree),
+        set_node_meta_bulk: (meta) => { _set_node_meta_bulk(tree, meta); },
     };
 }
 

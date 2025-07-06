@@ -88,29 +88,29 @@ export type IsAtomic<T> =
                                 ? true 
                                 : false;
 
-type FieldPathImpl<K extends string | number, T, TR extends TypeRange, TraversedTypes> = 
+type SubPathImpl<K extends string | number, T, TR extends TypeRange, TraversedTypes> = 
     // Check so that we don't recurse into the same type
     // by ensuring that the types are mutually assignable
     // mutually required to avoid false positives of subtypes
     true extends AnyIsEqual<TraversedTypes, T>
         ? (InRange<T, TR> extends true ? `.${K}` : never)
-        : (InRange<T, TR> extends true ? `.${K}` : never) | `.${K}${FieldPath<T, TR, TraversedTypes | T>}`;
+        : (InRange<T, TR> extends true ? `.${K}` : never) | `.${K}${SubPath<T, TR, TraversedTypes | T>}`;
 
-type FieldPathInternal<T, TR extends TypeRange, TraversedTypes = T> =
+type SubPathSplit<T, TR extends TypeRange, TraversedTypes = T> =
     IsAtomic<T> extends true 
         ? never
         : T extends readonly (infer V)[]
             ? IsTuple<T> extends true
                 ? {
-                    [K in TupleKeys<T>]-?: FieldPathImpl<K & string, T[K], TR, TraversedTypes>;
+                    [K in TupleKeys<T>]-?: SubPathImpl<K & string, T[K], TR, TraversedTypes>;
                     }[TupleKeys<T>]
-                : FieldPathImpl<ArrayKey, V, TR, TraversedTypes>
-            : { [K in keyof T]-?: FieldPathImpl<K & string, T[K], TR, TraversedTypes> }[keyof T];
+                : SubPathImpl<ArrayKey, V, TR, TraversedTypes>
+            : { [K in keyof T]-?: SubPathImpl<K & string, T[K], TR, TraversedTypes> }[keyof T];
 
-export type FieldPath<T, TR extends TypeRange, TraversedTypes = T> = T extends any ? FieldPathInternal<T, TR, TraversedTypes> : never;
-export type Path<T, TR extends TypeRange = TypeRange> = IsUnknown<T> extends true ? never : (FieldPath<T, TR> | (InRange<T, TR> extends true ? "" : never));
+export type SubPath<T, TR extends TypeRange, TraversedTypes = T> = T extends any ? SubPathSplit<T, TR, TraversedTypes> : never;
+export type Path<T, TR extends TypeRange = TypeRange> = IsUnknown<T> extends true ? never : (SubPath<T, TR> | (InRange<T, TR> extends true ? "" : never));
 
-export type PathValue<T, P extends Path<T>> =
+export type PathData<T, P extends Path<T>> =
     IsUnknown<T> extends true 
         ? unknown
         : T extends any
@@ -118,10 +118,10 @@ export type PathValue<T, P extends Path<T>> =
                 ? T
                 : P extends `.${infer K}.${infer R}`
                     ? K extends keyof T
-                        ? PathValue<T[K], `.${R}` & Path<T[K]>>
+                        ? PathData<T[K], `.${R}` & Path<T[K]>>
                         : K extends `${ArrayKey}`
                             ? T extends readonly (infer V)[]
-                                    ? PathValue<V, `.${R}` & Path<V>>
+                                    ? PathData<V, `.${R}` & Path<V>>
                                     : never
                             : never
                     : P extends `.${infer K}`
