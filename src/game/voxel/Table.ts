@@ -14,7 +14,7 @@ interface Position {
 
 type Configuration = [
   number,
-    number,
+  number,
   number,
   number,
   number,
@@ -67,7 +67,6 @@ const balancedConfigurations = [
   "01010101",
   "11001100",
   "00110011",
-
   "11101000",
   "00010111",
   "11010100",

@@ -894,8 +894,16 @@ export class Terrain {
       let voxel_center: Vector3 | null = null;
       let voxel_center_count = 0;
 
+      let blue = 0;
+      let red = 0;
+
       t.points.forEach(p => {
         p.voxels.forEach(vp => {
+          if (this.getBlock(vp.x, vp.y, vp.z).v === "solid") {
+            red++
+          } else {
+            blue++;
+          }
           if (voxel_center == null) {
             voxel_center = vp;
           } else {
@@ -916,10 +924,14 @@ export class Terrain {
         a.z * b.x - a.x * b.z,
         a.x * b.y - a.y * b.x).normalize();
 
-      const direction = other_center.subtract(triangle_center);
+      const direction = triangle_center.subtract(other_center);
 
       direction.normalize();
 
+      if (blue > red) {
+        direction.negateInPlace();
+      }
+
       // normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
       // normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
       // normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
@@ -928,7 +940,7 @@ export class Terrain {
       // normals.push(direction.x, direction.y, direction.z);
       // normals.push(direction.x, direction.y, direction.z);
 
-      if (triangle_normal.dot(direction) < 0) {
+      if (triangle_normal.dot(direction) > 0) {
         normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
         normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
         normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
