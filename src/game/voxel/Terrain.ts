@@ -20,6 +20,9 @@ import {
   VertexBuffer,
   VertexData,
 } from "@babylonjs/core";
+import {
+  NormalMaterial,
+} from "@babylonjs/materials";
 
 const axisNames = ["x", "y", "z"] as const;
 const axisDirection = [1, -1] as const;
@@ -86,6 +89,7 @@ interface Voxel {
     string | null
   ];
   points: Point[];
+  position: Vector3;
 }
 
 function is_line(l: Line, p1: Point, p2: Point) {
@@ -131,7 +135,7 @@ export class Terrain {
   constructor(scene: MainScene) {
     this.scene = scene;
 
-    this.size = 60;
+    this.size = 30;
     this.blocks = new Array(this.size * this.size * this.size)
       .fill(null)
       .map(() => ({
@@ -468,10 +472,6 @@ export class Terrain {
       .map((d) => (d.v === "solid" ? "1" : "0"))
       .join("");
 
-    if (x === 13 && y === 38 && z === 36) {
-      //console.log(config);
-    }
-
     const configIndex = configIndexToStr.findIndex((v) => v === config);
 
     if (configIndex >= 0) {
@@ -488,17 +488,11 @@ export class Terrain {
           voxelPos.z,
         );
 
+        corner.position = new Vector3(voxelPos.x, voxelPos.y, voxelPos.z);
+
         corner.edgesConfigs[cornerIndexToEdgeIndex[i]] = config;
 
         const edge = configuration?.[i];
-
-        if (
-          x + cornerPos.x == 13 &&
-          y + cornerPos.y == 38 &&
-          z + cornerPos.z == 36
-        ) {
-          //console.log(edge);
-        }
 
         if (edge) {
           const px = x + 0.5 + edge.x;
@@ -506,14 +500,6 @@ export class Terrain {
           const pz = z + 0.5 + edge.z;
 
           const point = this.getPoint(px, py, pz);
-
-          if (
-            x + cornerPos.x == 13 &&
-            y + cornerPos.y == 38 &&
-            z + cornerPos.z == 36
-          ) {
-            //console.log(point.position);
-          }
 
           point.voxels.push(voxelPos);
 
@@ -689,23 +675,6 @@ export class Terrain {
                       );
 
                       if (!allSelf && !allFar) {
-                        if (x == 13 && y == 38 && z == 36) {
-                          // console.log(cornerData);
-                          // console.log(farOpposedCornerData);
-                        }
-                        if (
-                          x == 13 &&
-                          y == 37 &&
-                          z == 36 &&
-                          axis == "y" &&
-                          sign == 1
-                        ) {
-                          // console.log(cornerData);
-                          // console.log(cornerData.edges.every(e => e !== null))
-                          // console.log(farOpposedCornerData);
-                          // console.log(farOpposedCornerData.edges.every(e => e !== null));
-                          // console.log(farOpposedCornerData.edges);
-                        }
                         const farOpposedCornerIndex =
                           revertedSelfAxisCornerIndexes.find(
                             (i) =>
@@ -908,6 +877,7 @@ export class Terrain {
   draw() {
     const positions: number[] = [];
     const indices: number[] = [];
+    const normals: number[] = [];
 
     this.triangles.forEach((t, i) => {
       positions.push(t.points[0].position.x, t.points[0].position.y, t.points[0].position.z);
@@ -916,10 +886,72 @@ export class Terrain {
       indices.push(indices.length);
       positions.push(t.points[2].position.x, t.points[2].position.y, t.points[2].position.z);
       indices.push(indices.length);
+
+      // we need to choose a side for the triangle
+
+      const triangle_center = t.points[0].position.add(t.points[1].position).add(t.points[2].position);
+
+      const voxels: Voxel[] = [];
+
+      t.points.forEach(p => {
+        p.voxels.forEach(vp => {
+          const voxel = this.getVoxel(vp.x, vp.y, vp.z);
+
+          voxels.push(voxel);
+        })
+      })
+
+      //voxels = voxels.filter((a, i, aa) => aa.indexOf(a) === i && aa.lastIndexOf(a) !== i);
+
+      let voxel_center: Vector3 | null = null;
+      let voxel_center_count = 0;
+
+      voxels.forEach(v => {
+        if (voxel_center == null) {
+          voxel_center = v.position;
+        } else {
+          voxel_center = voxel_center.add(v.position);
+        }
+
+        voxel_center_count++;
+      })
+
+      const other_center = new Vector3(voxel_center!.x / voxel_center_count, voxel_center!.y / voxel_center_count, voxel_center!.z / voxel_center_count);
+
+      const a = t.points[1].position.subtract(t.points[0].position);
+      const b = t.points[0].position.subtract(t.points[2].position);
+
+      const triangle_normal = new Vector3(
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x).normalize();
+
+      const direction = other_center.subtract(triangle_center);
+
+      direction.normalize();
+
+      // normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
+      // normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
+      // normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
+
+      normals.push(direction.x, direction.y, direction.z);
+      normals.push(direction.x, direction.y, direction.z);
+      normals.push(direction.x, direction.y, direction.z);
+
+      // if (triangle_normal.dot(direction) > 0) {
+      //   normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
+      //   normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
+      //   normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
+      // } else {
+      //   normals.push(-triangle_normal.x, -triangle_normal.y, -triangle_normal.z);
+      //   normals.push(-triangle_normal.x, -triangle_normal.y, -triangle_normal.z);
+      //   normals.push(-triangle_normal.x, -triangle_normal.y, -triangle_normal.z);
+      // }
     });
 
     const vertexData = new VertexData();
     vertexData.positions = positions;
+    vertexData.normals = normals;
     vertexData.indices = indices;
 
     if (!this.terrainMesh) {
@@ -931,7 +963,7 @@ export class Terrain {
 
       vertexData.applyToMesh(this.terrainMesh, false);
 
-      const mat = new StandardMaterial("mat", this.scene);
+      const mat = new NormalMaterial("mat", this.scene);
       mat.backFaceCulling = false;
       mat.ambientColor = new Color3(0.01, 0.01, 0.01);
       mat.disableLighting = true;

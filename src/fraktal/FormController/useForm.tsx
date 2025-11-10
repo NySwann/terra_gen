@@ -2,56 +2,6 @@ import { type Ref, useCallback, useEffect, useRef, useImperativeHandle } from "r
 import { make_tree, type ReactiveTree, type Tree, type TreeErrors } from "../lokta/tree";
 import type { BrowserNativeObject, IsAny, Primitive, Path, PathValue } from "../lokta/types";
 
-export type NonUndefined<T> = T extends undefined ? never : T;
-
-export type ExtractObjects<T> = T extends infer U
-  ? U extends object
-  ? U
-  : never
-  : never;
-
-export type DeepPartial<T> = T extends Primitive
-  ? T | undefined
-  : {
-    [K in keyof T]?: ExtractObjects<T[K]> extends never
-    ? T[K] | undefined
-    : DeepPartial<T[K]>;
-  } | undefined;
-
-export type DeepMap<T, TValue> =
-  IsAny<T> extends true
-  ? any
-  : T extends BrowserNativeObject
-  ? TValue
-  : T extends object
-  ? { [K in keyof T]: DeepMap<NonUndefined<T[K]>, TValue> }
-  : TValue;
-
-type FormContent = unknown;
-
-type DirtyFields<FC extends FormContent> = Partial<
-  Readonly<DeepMap<DeepPartial<FC>, boolean>>
->;
-
-export type FieldErrors = Record<string, { error: string }>;
-
-type DefaultValues<FC extends FormContent> = DeepPartial<FC>;
-
-type ValidationResolver<FC extends FormContent> = (values: FC) => TreeErrors;
-
-type OnFormValidHandler<FC extends FormContent> = (
-  data: FC,
-) => void;
-
-type OnFormInvalidHandler<FC extends FormContent> = (
-  errors: FieldErrors,
-) => void;
-
-type OnFormSave<FC extends FormContent> = (
-  onValid: OnFormValidHandler<FC>,
-  onInvalid?: OnFormInvalidHandler<FC>
-) => void;
-
 type FormResetAction<FC extends FormContent> = (defaultValues?: DefaultValues<FC>) => void;
 type FormTriggerAction<FC extends FormContent> = (
   name: Path<FC>,

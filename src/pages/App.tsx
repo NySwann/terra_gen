@@ -17,8 +17,8 @@ function App() {
       console.log("acquired");
 
       const canvasElement = document.createElement('canvas')
-      canvasElement.width = 1000;
-      canvasElement.height = 1000;
+      canvasElement.width = node.clientWidth;
+      canvasElement.height = node.clientHeight;
       //canvasElement.id = '#renderCanvas'
       node.appendChild(canvasElement);
 
@@ -40,6 +40,7 @@ function App() {
 
   return <MantineProvider theme={theme} defaultColorScheme='dark'>
     <AppShell
+      style={{ display: "flex", width: "100vw", height: '100vh' }}
       header={{ height: "4%" }}
       navbar={{
         width: "20%",
@@ -56,7 +57,7 @@ function App() {
         <Text>Trixel</Text>
       </AppShell.Header>
       <Navbar />
-      <AppShell.Main style={{ display: "flex", alignItems: "center", justifyContent: "stretch" }}><Flex ref={refCallback} /></AppShell.Main>
+      <AppShell.Main style={{ display: "flex", width: "100vw", height: "100vh", alignItems: "center", justifyContent: "center" }}><Flex ref={refCallback} style={{ width: "100%", height: "100%" }} /></AppShell.Main>
       <Aside />
       <AppShell.Footer style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Text id="display-fps">Zouin</Text>
