@@ -45,6 +45,7 @@ interface Quad {
   points: [Point, Point, Point, Point];
   lines: [Line, Line, Line, Line];
   triangles: [Triangle, Triangle];
+  inside: Vector3;
 }
 
 interface Line {
@@ -112,7 +113,7 @@ function distance(a: Vector3, b: Vector3) {
   );
 }
 
-let lines = true;
+let lines = false;
 let debug = false;
 
 export class Terrain {
@@ -357,6 +358,40 @@ export class Terrain {
     }
 
     quad.triangles = triangles;
+
+    let blue_center: Vector3 | null = null;
+    let red_center: Vector3 | null = null;
+
+    let blue = 0;
+    let red = 0;
+
+    quad.points.forEach(p => {
+      p.voxels.forEach(vp => {
+        if (this.getBlock(vp.x, vp.y, vp.z).v === "solid") {
+          red++;
+          if (red_center == null) {
+            red_center = vp;
+          } else {
+            red_center = red_center.add(vp);
+          }
+        } else {
+          blue++;
+          if (blue_center == null) {
+            blue_center = vp;
+          } else {
+            blue_center = blue_center.add(vp);
+          }
+        }
+      })
+    })
+
+    const quad_center = quad.points[0].position.add(quad.points[1].position).add(quad.points[2].position).add(quad.points[3].position).divide(new Vector3(4, 4, 4));
+
+    if (blue > red) {
+      quad.inside = new Vector3(blue_center!.x / blue, blue_center!.y / blue, blue_center!.z / blue).subtract(quad_center).negateInPlace();
+    } else if (red >= blue) {
+      quad.inside = new Vector3(red_center!.x / red, red_center!.y / red, red_center!.z / red).subtract(quad_center);
+    }
 
     this.triangles.push(...triangles);
 
@@ -887,60 +922,15 @@ export class Terrain {
       positions.push(t.points[2].position.x, t.points[2].position.y, t.points[2].position.z);
       indices.push(indices.length);
 
-      // we need to choose a side for the triangle
-
-      const triangle_center = t.points[0].position.add(t.points[1].position).add(t.points[2].position).divide(new Vector3(3, 3, 3));
-
-      let voxel_center: Vector3 | null = null;
-      let voxel_center_count = 0;
-
-      let blue = 0;
-      let red = 0;
-
-      t.points.forEach(p => {
-        p.voxels.forEach(vp => {
-          if (this.getBlock(vp.x, vp.y, vp.z).v === "solid") {
-            red++
-          } else {
-            blue++;
-          }
-          if (voxel_center == null) {
-            voxel_center = vp;
-          } else {
-            voxel_center = voxel_center.add(vp);
-          }
-
-          voxel_center_count++;
-        })
-      })
-
-      const other_center = new Vector3(voxel_center!.x / voxel_center_count, voxel_center!.y / voxel_center_count, voxel_center!.z / voxel_center_count);
-
       const a = t.points[1].position.subtract(t.points[0].position);
-      const b = t.points[0].position.subtract(t.points[2].position);
+      const b = t.points[2].position.subtract(t.points[0].position);
 
       const triangle_normal = new Vector3(
         a.y * b.z - a.z * b.y,
         a.z * b.x - a.x * b.z,
         a.x * b.y - a.y * b.x).normalize();
 
-      const direction = triangle_center.subtract(other_center);
-
-      direction.normalize();
-
-      if (blue > red) {
-        direction.negateInPlace();
-      }
-
-      // normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
-      // normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
-      // normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
-
-      // normals.push(direction.x, direction.y, direction.z);
-      // normals.push(direction.x, direction.y, direction.z);
-      // normals.push(direction.x, direction.y, direction.z);
-
-      if (triangle_normal.dot(direction) > 0) {
+      if (triangle_normal.dot(t.quad.inside.normalize()) > 0) {
         normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
         normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
         normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
