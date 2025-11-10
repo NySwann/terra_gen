@@ -135,7 +135,7 @@ export class Terrain {
   constructor(scene: MainScene) {
     this.scene = scene;
 
-    this.size = 30;
+    this.size = 60;
     this.blocks = new Array(this.size * this.size * this.size)
       .fill(null)
       .map(() => ({
@@ -889,31 +889,21 @@ export class Terrain {
 
       // we need to choose a side for the triangle
 
-      const triangle_center = t.points[0].position.add(t.points[1].position).add(t.points[2].position);
-
-      const voxels: Voxel[] = [];
-
-      t.points.forEach(p => {
-        p.voxels.forEach(vp => {
-          const voxel = this.getVoxel(vp.x, vp.y, vp.z);
-
-          voxels.push(voxel);
-        })
-      })
-
-      //voxels = voxels.filter((a, i, aa) => aa.indexOf(a) === i && aa.lastIndexOf(a) !== i);
+      const triangle_center = t.points[0].position.add(t.points[1].position).add(t.points[2].position).divide(new Vector3(3, 3, 3));
 
       let voxel_center: Vector3 | null = null;
       let voxel_center_count = 0;
 
-      voxels.forEach(v => {
-        if (voxel_center == null) {
-          voxel_center = v.position;
-        } else {
-          voxel_center = voxel_center.add(v.position);
-        }
+      t.points.forEach(p => {
+        p.voxels.forEach(vp => {
+          if (voxel_center == null) {
+            voxel_center = vp;
+          } else {
+            voxel_center = voxel_center.add(vp);
+          }
 
-        voxel_center_count++;
+          voxel_center_count++;
+        })
       })
 
       const other_center = new Vector3(voxel_center!.x / voxel_center_count, voxel_center!.y / voxel_center_count, voxel_center!.z / voxel_center_count);
@@ -934,19 +924,19 @@ export class Terrain {
       // normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
       // normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
 
-      normals.push(direction.x, direction.y, direction.z);
-      normals.push(direction.x, direction.y, direction.z);
-      normals.push(direction.x, direction.y, direction.z);
+      // normals.push(direction.x, direction.y, direction.z);
+      // normals.push(direction.x, direction.y, direction.z);
+      // normals.push(direction.x, direction.y, direction.z);
 
-      // if (triangle_normal.dot(direction) > 0) {
-      //   normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
-      //   normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
-      //   normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
-      // } else {
-      //   normals.push(-triangle_normal.x, -triangle_normal.y, -triangle_normal.z);
-      //   normals.push(-triangle_normal.x, -triangle_normal.y, -triangle_normal.z);
-      //   normals.push(-triangle_normal.x, -triangle_normal.y, -triangle_normal.z);
-      // }
+      if (triangle_normal.dot(direction) < 0) {
+        normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
+        normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
+        normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
+      } else {
+        normals.push(-triangle_normal.x, -triangle_normal.y, -triangle_normal.z);
+        normals.push(-triangle_normal.x, -triangle_normal.y, -triangle_normal.z);
+        normals.push(-triangle_normal.x, -triangle_normal.y, -triangle_normal.z);
+      }
     });
 
     const vertexData = new VertexData();
