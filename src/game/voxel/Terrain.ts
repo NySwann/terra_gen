@@ -910,7 +910,8 @@ export class Terrain {
     );
 
     this.linesMesh.parent = this.rendered;
-    this.linesMesh.color = new Color3(0.2, 0.8, 1).scale(0.8);
+    //this.linesMesh.color = new Color3(0.2, 0.8, 1).scale(0.8);
+    this.linesMesh.color = Color3.Black();
 
     {
       const i2 = this.linesMesh.createInstance("l");
