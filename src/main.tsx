@@ -10,7 +10,7 @@ window.BABYLON = { ...Core }
 
 createRoot(document.getElementById("root")!).render(
   // <FormApp />
-  <StrictMode>
-    <App />
-  </StrictMode>,
+  // <StrictMode>
+  <App />
+  // </StrictMode>,
 );

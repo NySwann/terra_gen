@@ -37,8 +37,8 @@ import MainScene from "../scenes/MainScene/MainScene";
 
 interface Triangle {
   points: [Point, Point, Point];
+  normal: Vector3;
   quad: Quad;
-  dead: boolean;
 }
 
 interface Quad {
@@ -56,9 +56,9 @@ interface Line {
 
 interface Point {
   position: Vector3;
-  lines: Line[];
-  dead: boolean;
   voxels: Vector3[];
+  lines: Line[];
+  triangles: Triangle[];
 }
 
 
@@ -113,7 +113,7 @@ function distance(a: Vector3, b: Vector3) {
   );
 }
 
-let lines = false;
+let lines = true;
 let debug = false;
 
 export class Terrain {
@@ -282,7 +282,7 @@ export class Terrain {
   }
 
   getPoint(x: number, y: number, z: number): Point {
-    const voxel = this.getVoxel(Math.round(x), Math.round(y), Math.round(z));
+    const voxel = this.getVoxel(Math.floor(x), Math.floor(y), Math.floor(z));
 
     if (!voxel) {
       throw new Error();
@@ -296,7 +296,7 @@ export class Terrain {
       }
     }
 
-    const point: Point = { position: new Vector3(x, y, z), lines: [], voxels: [], dead: false };
+    const point: Point = { position: new Vector3(x, y, z), lines: [], voxels: [], triangles: [] };
 
     voxel.points.push(point);
 
@@ -308,10 +308,15 @@ export class Terrain {
       if (line.quads.length > 2) {
         for (const quad of line.quads) {
           if (quad.lines.every(l => l.quads.length > 2)) {
-            this.triangles = this.triangles.filter(t => t.quad !== quad);
+            quad.points.forEach(p => {
+              p.triangles = p.triangles.filter(t => t.quad !== quad);
+            })
+
             quad.lines.forEach(l => {
               l.quads = l.quads.filter(q => q !== quad);
             });
+
+            this.triangles = this.triangles.filter(t => t.quad !== quad);
             this.meshLines = this.meshLines.filter(l => (l[0] !== quad.points[0] || l[1] !== quad.points[2]) && (l[1] !== quad.points[0] || l[0] !== quad.points[2]));
             this.meshLines = this.meshLines.filter(l => (l[0] !== quad.points[1] || l[1] !== quad.points[3]) && (l[1] !== quad.points[1] || l[0] !== quad.points[3]));
           }
@@ -334,7 +339,13 @@ export class Terrain {
     //   return;
     // }
 
-    const lines: [Line, Line, Line, Line] = [p1.lines.find((l) => is_line(l, p1, p2))!, p2.lines.find((l) => is_line(l, p2, p3))!, p3.lines.find((l) => is_line(l, p3, p4))!, p4.lines.find((l) => is_line(l, p4, p1))!];
+    const l1 = p1.lines.find((l) => is_line(l, p1, p2))!;
+
+    if (l1.quads.some(q => q.points.includes(p1) && q.points.includes(p2) && q.points.includes(p3) && q.points.includes(p4))) {
+      return;
+    }
+
+    const lines: [Line, Line, Line, Line] = [l1, p2.lines.find((l) => is_line(l, p2, p3))!, p3.lines.find((l) => is_line(l, p3, p4))!, p4.lines.find((l) => is_line(l, p4, p1))!];
 
     const quad: Quad = { points: [p1, p2, p3, p4], lines };
 
@@ -347,14 +358,30 @@ export class Terrain {
 
     if (d1 <= d2) {
       triangles = [
-        { points: [p1, p2, p3], quad, dead: false },
-        { points: [p3, p4, p1], quad, dead: false },
+        { points: [p1, p2, p3], quad },
+        { points: [p3, p4, p1], quad },
       ];
     } else {
       triangles = [
-        { points: [p2, p3, p4], quad, dead: false },
-        { points: [p4, p1, p2], quad, dead: false },
+        { points: [p2, p3, p4], quad },
+        { points: [p4, p1, p2], quad },
       ];
+    }
+
+    for (const t of triangles) {
+      for (const p of t.points) {
+        if (p.triangles.length > 24) {
+          console.log(p.triangles.map(t => t.points.map(p => p.position.toString())))
+          throw new Error();
+        }
+
+        p.triangles.push(t);
+
+        if (p.triangles.length > 24) {
+          console.log(p.triangles.map(t => t.points.map(p => p.position.toString())))
+          throw new Error();
+        }
+      }
     }
 
     quad.triangles = triangles;
@@ -387,10 +414,25 @@ export class Terrain {
 
     const quad_center = quad.points[0].position.add(quad.points[1].position).add(quad.points[2].position).add(quad.points[3].position).divide(new Vector3(4, 4, 4));
 
-    if (blue > red) {
-      quad.inside = new Vector3(blue_center!.x / blue, blue_center!.y / blue, blue_center!.z / blue).subtract(quad_center).negateInPlace();
-    } else if (red >= blue) {
-      quad.inside = new Vector3(red_center!.x / red, red_center!.y / red, red_center!.z / red).subtract(quad_center);
+    const bc = blue > 0 ? new Vector3(blue_center!.x / blue, blue_center!.y / blue, blue_center!.z / blue) : null;
+    const rc = red > 0 ? new Vector3(red_center!.x / red, red_center!.y / red, red_center!.z / red) : null;
+
+    if (bc && rc && blue != red) {
+      quad.inside = bc.subtract(rc);
+    } else if (rc) {
+      quad.inside = quad_center.subtract(rc);
+    } else {
+      quad.inside = bc.subtract(quad_center);
+    }
+
+    for (const t of triangles) {
+      const triangle_normal = this.get_normal(t.points[0], t.points[1], t.points[2]);
+
+      if (this.normal_side(triangle_normal, t.quad.inside.normalize())) {
+        t.normal = triangle_normal;
+      } else {
+        t.normal = triangle_normal.negate();
+      }
     }
 
     this.triangles.push(...triangles);
@@ -471,7 +513,16 @@ export class Terrain {
       const line = { a: p1, b: p2, quads: [] };
 
       p1.lines.push(line);
+
+      if (p1.lines.length > 6) {
+        throw new Error();
+      }
+
       p2.lines.push(line);
+
+      if (p1.lines.length > 6) {
+        throw new Error();
+      }
 
       // search for quad
 
@@ -561,8 +612,6 @@ export class Terrain {
           }
 
           for (const point of voxel.points) {
-            point.dead = true;
-
             for (const line of point.lines) {
               if (line.a === point) {
                 line.b.lines = line.b.lines.filter(l => l !== line);
@@ -578,7 +627,9 @@ export class Terrain {
                 }
 
                 for (const triangle of quad.triangles) {
-                  triangle.dead = true;
+                  for (const point of triangle.points) {
+                    point.triangles = point.triangles.filter(t => t !== triangle);
+                  }
                 }
               }
             }
@@ -909,37 +960,109 @@ export class Terrain {
     customMesh.color = Color3.White();
   }
 
+  get_normal(p0: Point, p1: Point, p2: Point) {
+    const a = p0.position.subtract(p1.position);
+    const b = p2.position.subtract(p0.position);
+
+    return new Vector3(
+      a.y * b.z - a.z * b.y,
+      a.z * b.x - a.x * b.z,
+      a.x * b.y - a.y * b.x).normalize()
+  }
+
+  normal_side(n1: Vector3, n2: Vector3) {
+    if (n1.dot(n2) > 0) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   draw() {
     const positions: number[] = [];
     const indices: number[] = [];
     const normals: number[] = [];
 
-    this.triangles.forEach((t, i) => {
-      positions.push(t.points[0].position.x, t.points[0].position.y, t.points[0].position.z);
-      indices.push(indices.length);
-      positions.push(t.points[1].position.x, t.points[1].position.y, t.points[1].position.z);
-      indices.push(indices.length);
-      positions.push(t.points[2].position.x, t.points[2].position.y, t.points[2].position.z);
-      indices.push(indices.length);
+    for (const t of this.triangles) {
+      // on mets tous les triangles dans le meme sens
 
-      const a = t.points[1].position.subtract(t.points[0].position);
-      const b = t.points[2].position.subtract(t.points[0].position);
+      const t1 = t.points[0].triangles.find(tl => tl !== t && t.points[1].triangles.some(tr => tl === tr))!;
 
-      const triangle_normal = new Vector3(
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x).normalize();
+      if (!t1.points.some(p => p === t.points[0]) || !t1.points.some(p => p === t.points[1])) {
 
-      if (triangle_normal.dot(t.quad.inside.normalize()) > 0) {
-        normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
-        normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
-        normals.push(triangle_normal.x, triangle_normal.y, triangle_normal.z);
-      } else {
-        normals.push(-triangle_normal.x, -triangle_normal.y, -triangle_normal.z);
-        normals.push(-triangle_normal.x, -triangle_normal.y, -triangle_normal.z);
-        normals.push(-triangle_normal.x, -triangle_normal.y, -triangle_normal.z);
+        console.log(t.points.map(p => p.position.toString()));
+        console.log(t1.points.map(p => p.position.toString()));
+        console.log(t.points[0].triangles.map(t => t.points.map(p => p.position.toString())));
+        console.log(t.points[1].triangles.map(t => t.points.map(p => p.position.toString())));
+
+        throw new Error();
       }
-    });
+
+      let t1points = t1.points;
+      const t1normal = t1.normal;
+
+      if ((t1points[0] !== t.points[0] || t1points[1] !== t.points[1])
+        && (t1points[1] !== t.points[0] || t1points[2] !== t.points[1])
+        && (t1points[2] !== t.points[0] || t1points[0] !== t.points[1])) {
+        t1points = [t1points[0], t1points[2], t1points[1]];
+        //t1normal = t1normal.negate();
+      }
+
+      const t2 = t.points[1].triangles.find(tl => t.points[2].triangles.some(tr => tl === tr && tr !== t))!;
+
+      let t2points = t2.points;
+      const t2normal = t2.normal;
+
+      if ((t2points[0] !== t.points[1] || t2points[1] !== t.points[2])
+        && (t2points[1] !== t.points[1] || t2points[2] !== t.points[2])
+        && (t2points[2] !== t.points[1] || t2points[0] !== t.points[2])) {
+        t2points = [t2points[0], t2points[2], t2points[1]];
+        //t2normal = t2normal.negate();
+      }
+
+      const t3 = t.points[2].triangles.find(tl => t.points[0].triangles.some(tr => tl === tr && tr !== t))!;
+
+      let t3points = t3.points;
+      const t3normal = t3.normal;
+
+      if ((t3points[0] !== t.points[2] || t3points[1] !== t.points[0])
+        && (t3points[1] !== t.points[2] || t3points[2] !== t.points[0])
+        && (t3points[2] !== t.points[2] || t3points[0] !== t.points[0])) {
+        t3points = [t3points[0], t3points[2], t3points[1]];
+        //t3normal = t3.normal.negate();
+      }
+
+      const side = this.normal_side(this.get_normal(t.points[0], t.points[1], t.points[2]), t.normal);
+      const side1 = this.normal_side(this.get_normal(t1points[0], t1points[1], t1points[2]), t1normal);
+      const side2 = this.normal_side(this.get_normal(t2points[0], t2points[1], t2points[2]), t2normal);
+      const side3 = this.normal_side(this.get_normal(t3points[0], t3points[1], t3points[2]), t3normal);
+
+      const l = ((side1 ? 1 : 0) + (side2 ? 1 : 0) + (side3 ? 1 : 0)) > 1;
+
+      if (
+        // 1 == 2 && 
+        side == l) {
+        normals.push(-t.normal.x, -t.normal.y, -t.normal.z);
+        normals.push(-t.normal.x, -t.normal.y, -t.normal.z);
+        normals.push(-t.normal.x, -t.normal.y, -t.normal.z);
+
+        positions.push(t.points[0].position.x, t.points[0].position.y, t.points[0].position.z);
+        positions.push(t.points[2].position.x, t.points[2].position.y, t.points[2].position.z);
+        positions.push(t.points[1].position.x, t.points[1].position.y, t.points[1].position.z);
+      } else {
+        normals.push(t.normal.x, t.normal.y, t.normal.z);
+        normals.push(t.normal.x, t.normal.y, t.normal.z);
+        normals.push(t.normal.x, t.normal.y, t.normal.z);
+
+        positions.push(t.points[0].position.x, t.points[0].position.y, t.points[0].position.z);
+        positions.push(t.points[1].position.x, t.points[1].position.y, t.points[1].position.z);
+        positions.push(t.points[2].position.x, t.points[2].position.y, t.points[2].position.z);
+      }
+
+      indices.push(indices.length);
+      indices.push(indices.length);
+      indices.push(indices.length);
+    };
 
     const vertexData = new VertexData();
     vertexData.positions = positions;
@@ -956,8 +1079,10 @@ export class Terrain {
       vertexData.applyToMesh(this.terrainMesh, false);
 
       const mat = new NormalMaterial("mat", this.scene);
+      //const mat = new StandardMaterial("mat", this.scene);
       mat.backFaceCulling = false;
-      mat.ambientColor = new Color3(0.01, 0.01, 0.01);
+      mat.diffuseColor = Color3.Black();
+      //mat.ambientColor = new Color3(0.01, 0.01, 0.01);
       mat.disableLighting = true;
       //mat.wireframe = true;
       this.terrainMesh.material = mat;
