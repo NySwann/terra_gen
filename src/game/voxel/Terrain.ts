@@ -39,6 +39,7 @@ interface Triangle {
   points: [Point, Point, Point];
   normal: Vector3;
   quad: Quad;
+  dead: boolean;
 }
 
 interface Quad {
@@ -56,6 +57,7 @@ interface Line {
 
 interface Point {
   position: Vector3;
+  dead: boolean;
   voxels: Vector3[];
   lines: Line[];
   triangles: Triangle[];
@@ -282,7 +284,7 @@ export class Terrain {
   }
 
   getPoint(x: number, y: number, z: number): Point {
-    const voxel = this.getVoxel(Math.floor(x), Math.floor(y), Math.floor(z));
+    const voxel = this.getVoxel(Math.round(x), Math.round(y), Math.round(z));
 
     if (!voxel) {
       throw new Error();
@@ -296,7 +298,7 @@ export class Terrain {
       }
     }
 
-    const point: Point = { position: new Vector3(x, y, z), lines: [], voxels: [], triangles: [] };
+    const point: Point = { position: new Vector3(x, y, z), lines: [], voxels: [], dead: false, triangles: [] };
 
     voxel.points.push(point);
 
@@ -330,15 +332,6 @@ export class Terrain {
       return;
     }
 
-    // if (
-    //   p1.lines.length > 4 &&
-    //   p2.lines.length > 4 &&
-    //   p3.lines.length > 4 &&
-    //   p4.lines.length > 4
-    // ) {
-    //   return;
-    // }
-
     const l1 = p1.lines.find((l) => is_line(l, p1, p2))!;
 
     if (l1.quads.some(q => q.points.includes(p1) && q.points.includes(p2) && q.points.includes(p3) && q.points.includes(p4))) {
@@ -358,13 +351,13 @@ export class Terrain {
 
     if (d1 <= d2) {
       triangles = [
-        { points: [p1, p2, p3], quad },
-        { points: [p3, p4, p1], quad },
+        { points: [p1, p2, p3], quad, dead: false },
+        { points: [p3, p4, p1], quad, dead: false },
       ];
     } else {
       triangles = [
-        { points: [p2, p3, p4], quad },
-        { points: [p4, p1, p2], quad },
+        { points: [p2, p3, p4], quad, dead: false },
+        { points: [p4, p1, p2], quad, dead: false },
       ];
     }
 
@@ -514,13 +507,13 @@ export class Terrain {
 
       p1.lines.push(line);
 
-      if (p1.lines.length > 6) {
+      if (p1.lines.length > 8) {
         throw new Error();
       }
 
       p2.lines.push(line);
 
-      if (p1.lines.length > 6) {
+      if (p1.lines.length > 8) {
         throw new Error();
       }
 
@@ -612,6 +605,8 @@ export class Terrain {
           }
 
           for (const point of voxel.points) {
+            point.dead = true;
+
             for (const line of point.lines) {
               if (line.a === point) {
                 line.b.lines = line.b.lines.filter(l => l !== line);
@@ -627,8 +622,10 @@ export class Terrain {
                 }
 
                 for (const triangle of quad.triangles) {
+                  triangle.dead = true;
+
                   for (const point of triangle.points) {
-                    point.triangles = point.triangles.filter(t => t !== triangle);
+                    point.triangles = point.triangles.filter(t => t !== triangle)
                   }
                 }
               }
@@ -986,14 +983,20 @@ export class Terrain {
     for (const t of this.triangles) {
       // on mets tous les triangles dans le meme sens
 
-      const t1 = t.points[0].triangles.find(tl => tl !== t && t.points[1].triangles.some(tr => tl === tr))!;
+      let tpoints = t.points;
 
-      if (!t1.points.some(p => p === t.points[0]) || !t1.points.some(p => p === t.points[1])) {
+      if (!this.normal_side(this.get_normal(tpoints[0], tpoints[1], tpoints[2]), t.normal)) {
+        tpoints = [tpoints[0], tpoints[2], tpoints[1]];
+      }
 
-        console.log(t.points.map(p => p.position.toString()));
+      const t1 = tpoints[0].triangles.find(tl => tl !== t && tpoints[1].triangles.some(tr => tl === tr))!;
+
+      if (!t1.points.some(p => p === tpoints[0]) || !t1.points.some(p => p === tpoints[1])) {
+
+        console.log(tpoints.map(p => p.position.toString()));
         console.log(t1.points.map(p => p.position.toString()));
-        console.log(t.points[0].triangles.map(t => t.points.map(p => p.position.toString())));
-        console.log(t.points[1].triangles.map(t => t.points.map(p => p.position.toString())));
+        console.log(tpoints[0].triangles.map(t => tpoints.map(p => p.position.toString())));
+        console.log(tpoints[1].triangles.map(t => tpoints.map(p => p.position.toString())));
 
         throw new Error();
       }
@@ -1001,38 +1004,38 @@ export class Terrain {
       let t1points = t1.points;
       const t1normal = t1.normal;
 
-      if ((t1points[0] !== t.points[0] || t1points[1] !== t.points[1])
-        && (t1points[1] !== t.points[0] || t1points[2] !== t.points[1])
-        && (t1points[2] !== t.points[0] || t1points[0] !== t.points[1])) {
+      if ((t1points[0] !== tpoints[0] || t1points[1] !== tpoints[1])
+        && (t1points[1] !== tpoints[0] || t1points[2] !== tpoints[1])
+        && (t1points[2] !== tpoints[0] || t1points[0] !== tpoints[1])) {
         t1points = [t1points[0], t1points[2], t1points[1]];
         //t1normal = t1normal.negate();
       }
 
-      const t2 = t.points[1].triangles.find(tl => t.points[2].triangles.some(tr => tl === tr && tr !== t))!;
+      const t2 = tpoints[1].triangles.find(tl => tpoints[2].triangles.some(tr => tl === tr && tr !== t))!;
 
       let t2points = t2.points;
       const t2normal = t2.normal;
 
-      if ((t2points[0] !== t.points[1] || t2points[1] !== t.points[2])
-        && (t2points[1] !== t.points[1] || t2points[2] !== t.points[2])
-        && (t2points[2] !== t.points[1] || t2points[0] !== t.points[2])) {
+      if ((t2points[0] !== tpoints[1] || t2points[1] !== tpoints[2])
+        && (t2points[1] !== tpoints[1] || t2points[2] !== tpoints[2])
+        && (t2points[2] !== tpoints[1] || t2points[0] !== tpoints[2])) {
         t2points = [t2points[0], t2points[2], t2points[1]];
         //t2normal = t2normal.negate();
       }
 
-      const t3 = t.points[2].triangles.find(tl => t.points[0].triangles.some(tr => tl === tr && tr !== t))!;
+      const t3 = tpoints[2].triangles.find(tl => tpoints[0].triangles.some(tr => tl === tr && tr !== t))!;
 
       let t3points = t3.points;
       const t3normal = t3.normal;
 
-      if ((t3points[0] !== t.points[2] || t3points[1] !== t.points[0])
-        && (t3points[1] !== t.points[2] || t3points[2] !== t.points[0])
-        && (t3points[2] !== t.points[2] || t3points[0] !== t.points[0])) {
+      if ((t3points[0] !== tpoints[2] || t3points[1] !== tpoints[0])
+        && (t3points[1] !== tpoints[2] || t3points[2] !== tpoints[0])
+        && (t3points[2] !== tpoints[2] || t3points[0] !== tpoints[0])) {
         t3points = [t3points[0], t3points[2], t3points[1]];
         //t3normal = t3.normal.negate();
       }
 
-      const side = this.normal_side(this.get_normal(t.points[0], t.points[1], t.points[2]), t.normal);
+      const side = this.normal_side(this.get_normal(tpoints[0], tpoints[1], tpoints[2]), t.normal);
       const side1 = this.normal_side(this.get_normal(t1points[0], t1points[1], t1points[2]), t1normal);
       const side2 = this.normal_side(this.get_normal(t2points[0], t2points[1], t2points[2]), t2normal);
       const side3 = this.normal_side(this.get_normal(t3points[0], t3points[1], t3points[2]), t3normal);
@@ -1046,17 +1049,17 @@ export class Terrain {
         normals.push(-t.normal.x, -t.normal.y, -t.normal.z);
         normals.push(-t.normal.x, -t.normal.y, -t.normal.z);
 
-        positions.push(t.points[0].position.x, t.points[0].position.y, t.points[0].position.z);
-        positions.push(t.points[2].position.x, t.points[2].position.y, t.points[2].position.z);
-        positions.push(t.points[1].position.x, t.points[1].position.y, t.points[1].position.z);
+        positions.push(tpoints[0].position.x, tpoints[0].position.y, tpoints[0].position.z);
+        positions.push(tpoints[2].position.x, tpoints[2].position.y, tpoints[2].position.z);
+        positions.push(tpoints[1].position.x, tpoints[1].position.y, tpoints[1].position.z);
       } else {
         normals.push(t.normal.x, t.normal.y, t.normal.z);
         normals.push(t.normal.x, t.normal.y, t.normal.z);
         normals.push(t.normal.x, t.normal.y, t.normal.z);
 
-        positions.push(t.points[0].position.x, t.points[0].position.y, t.points[0].position.z);
-        positions.push(t.points[1].position.x, t.points[1].position.y, t.points[1].position.z);
-        positions.push(t.points[2].position.x, t.points[2].position.y, t.points[2].position.z);
+        positions.push(tpoints[0].position.x, tpoints[0].position.y, tpoints[0].position.z);
+        positions.push(tpoints[1].position.x, tpoints[1].position.y, tpoints[1].position.z);
+        positions.push(tpoints[2].position.x, tpoints[2].position.y, tpoints[2].position.z);
       }
 
       indices.push(indices.length);
@@ -1080,7 +1083,7 @@ export class Terrain {
 
       const mat = new NormalMaterial("mat", this.scene);
       //const mat = new StandardMaterial("mat", this.scene);
-      mat.backFaceCulling = false;
+      mat.backFaceCulling = true;
       mat.diffuseColor = Color3.Black();
       //mat.ambientColor = new Color3(0.01, 0.01, 0.01);
       mat.disableLighting = true;
